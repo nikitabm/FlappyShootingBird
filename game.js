@@ -75,8 +75,25 @@ class Entity {
         this.h = h;
         this.sprite = sprite;
     }
+    update() {
+
+    }
     draw() {
         this.sprite.draw(this.x, this.y, this.w, this.h);
+    }
+}
+
+class Foreground extends Entity {
+    constructor(sprite, xSpeed, x, y, w, h) {
+        super(sprite, x, y, w, h);
+        this.xSpeed = xSpeed;
+    }
+    draw() {
+        this.sprite.draw(this.x, this.y, this.w, this.h);
+        this.sprite.draw(this.x + this.w, this.y, this.w, this.h);
+    }
+    update() {
+        this.x = (this.x + this.xSpeed) % (this.w / 2);
     }
 }
 
@@ -90,6 +107,13 @@ const bgRight = new Entity(backgroundSpr, backgroundSpr.width, cvs.height - back
 const getReadySpr = new Sprite(image, 0, 228, 173, 152);
 const getReady = new Entity(getReadySpr, cvs.width / 2 - getReadySpr.width / 2, 100,
     getReadySpr.width, getReadySpr.height);
+
+//Foreground Object
+const foregroundSpr = new Sprite(image, 276, 0, 224, 112);
+const fgLeft = new Foreground(foregroundSpr, -2, 0, cvs.height - foregroundSpr.height, foregroundSpr.width, foregroundSpr.height);
+
+
+
 
 // CONTROL THE GAME
 cvs.addEventListener("click", function (evt) {
@@ -120,47 +144,6 @@ cvs.addEventListener("click", function (evt) {
             break;
     }
 });
-
-
-// BACKGROUND
-const bg = {
-    sX: 0,
-    sY: 0,
-    w: 275,
-    h: 226,
-    x: 0,
-    y: cvs.height - 226,
-
-    render: function () {
-        ctx.drawImage(image, this.sX, this.sY, this.w, this.h, this.x, this.y, this.w, this.h);
-
-        ctx.drawImage(image, this.sX, this.sY, this.w, this.h, this.x + this.w, this.y, this.w, this.h);
-    }
-}
-
-// FOREGROUND
-const fg = {
-    sX: 276,
-    sY: 0,
-    w: 224,
-    h: 112,
-    x: 0,
-    y: cvs.height - 112,
-
-    dx: 2,
-
-    render: function () {
-        ctx.drawImage(image, this.sX, this.sY, this.w, this.h, this.x, this.y, this.w, this.h);
-
-        ctx.drawImage(image, this.sX, this.sY, this.w, this.h, this.x + this.w, this.y, this.w, this.h);
-    },
-
-    update: function () {
-        if (state.current == state.game) {
-            this.x = (this.x - this.dx) % (this.w / 2);
-        }
-    }
-}
 
 // BIRD
 const bird = {
@@ -373,7 +356,8 @@ function render() {
     bgLeft.draw();
     bgRight.draw();
     pipes.render();
-    fg.render();
+
+    fgLeft.draw();
     bird.render();
     gameOver.render();
     score.render();
@@ -385,7 +369,10 @@ function render() {
 // UPDATE
 function update() {
     bird.update();
-    fg.update();
+    // fg.update();
+    if (state.current == state.game) {
+        fgLeft.update();
+    }
     pipes.update();
 }
 
