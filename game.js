@@ -253,25 +253,19 @@ const birdAnimCoords = [
     { x: 276, y: 139 }
 ];
 const birdSpr = new Sprite(image, 276, 112, 36, 26);
-const birdb = new Bird(birdSpr, false, true, birdAnimCoords, 50, 50, 34, 26, 0, 0.25, 4.6);
-
-
-
+const bird = new Bird(birdSpr, false, true, birdAnimCoords, 50, 50, 34, 26, 0, 0.25, 4.6);
 
 
 
 objectManager.registerObject(backgroundLeft);
 objectManager.registerObject(backgroundRight);
 
-
-
 objectManager.registerObject(foreground);
-objectManager.registerObject(birdb);
+objectManager.registerObject(bird);
 
 objectManager.registerObject(gameOver);
 objectManager.registerObject(getReady);
 
-generatePipeObstacle(85, 150);
 
 
 // CONTROL THE GAME
@@ -283,13 +277,15 @@ cvs.addEventListener("click", function (evt) {
             SWOOSHING.play();
 
             getReady.visible = false;
-            birdb.active = true;
+            generatePipeObstacle(85, 150);
+
+            bird.active = true;
             foreground.active = true;
             break;
 
         case state.game:
             // if (bird.y - bird.radius <= 0) return;
-            birdb.jump();
+            bird.jump();
             // bird.flap();
             FLAP.play();
             break;
