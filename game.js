@@ -66,31 +66,56 @@ class Sprite {
 }
 
 class Entity {
-    constructor(sprite, x, y, w, h) {
+    constructor(sprite, active, visible, x, y, w, h) {
         this.sprite = sprite;
         this.x = x;
         this.y = y;
         this.w = w;
         this.h = h;
+        this.active = active;
+        this.visible = visible;
     }
-    update() {
+    update() { }
 
-    }
     draw() {
-        this.sprite.draw(this.x, this.y, this.w, this.h);
+        if (this.visible) {
+            this.sprite.draw(this.x, this.y, this.w, this.h);
+        }
     }
 }
 
+class Foreground extends Entity {
+    constructor(sprite, active, visible, xSpeed, x, y, w, h, boxColliderW, boxColliderH) {
+        super(sprite, active, visible, x, y, w, h);
+        this.xSpeed = xSpeed;
+        this.boxCollider = new BoxCollider(boxColliderW, boxColliderH);
+    }
+    draw() {
+        if (this.visible) {
+            this.sprite.draw(this.x, this.y, this.w, this.h);
+            this.sprite.draw(this.x + this.w, this.y, this.w, this.h);
+        }
+    }
+    update() {
+        if (this.active) {
+            this.x = (this.x + this.xSpeed) % (this.w / 2);
+        }
+    }
+}
 
 class Bird extends Entity {
-    constructor(sprite, animationCoords, x, y, w, h) {
+    constructor(sprite, active, visible, animationCoords, x, y, w, h, yVelocity, gravity, jumpForce) {
 
-        super(sprite, x, y, w, h);
+        super(sprite, active, visible, x, y, w, h);
 
         this.animationCoords = animationCoords;
         this.animFrame = 0;
+        this.yVelocity = yVelocity;
+        this.gravity = gravity;
+        this.jumpForce = jumpForce;
     }
-    update() {
+
+    setAnimationFrame() {
         // IF THE GAME STATE IS GET READY STATE, THE BIRD MUST FLAP SLOWLY
         this.period = state.current == state.getReady ? 10 : 5;
         // WE INCREMENT THE FRAME BY 1, EACH PERIOD
@@ -100,45 +125,125 @@ class Bird extends Entity {
 
         this.sprite.imageX = this.animationCoords[this.animFrame].x;
         this.sprite.imageY = this.animationCoords[this.animFrame].y;
+    }
 
+    jump() {
+        this.yVelocity = -this.jumpForce;
+    }
+
+    update() {
+        this.setAnimationFrame();
+
+        if (this.active) {
+            this.yVelocity += this.gravity;
+            this.y += this.yVelocity;
+        }
     }
 }
 
-class Foreground extends Entity {
-    constructor(sprite, xSpeed, x, y, w, h) {
-        super(sprite, x, y, w, h);
+class ObjectManager {
+
+    constructor() {
+        this.objects = [];
+        this.colliders = [];
+    }
+    registerObject(object) {
+        this.objects.push(object);
+    }
+
+    unRegisterObject(object) {
+        this.objects = this.objects.filter(obj => obj !== object);
+    }
+
+    registerCollider(collider) {
+
+    }
+    unRegisterCollider(collider) {
+
+    }
+
+    renderObjects() {
+        ctx.fillStyle = "#70c5ce";
+        ctx.fillRect(0, 0, cvs.width, cvs.height);
+        this.objects.forEach(element => {
+            element.draw();
+        });
+    }
+    updateObjects() {
+        this.objects.forEach(element => {
+            element.update();
+        });
+    }
+}
+
+
+
+class PipeObstacle extends Entity {
+    constructor(topPipeSpr, botPipeSpr, active, visible, xSpeed, gap, maxYPos, x, y, w, h) {
+
+        super(topPipeSpr, active, visible, x, y, w, h);
         this.xSpeed = xSpeed;
+        this.gap = gap;
+        this.maxYPos = maxYPos;
     }
     draw() {
-        this.sprite.draw(this.x, this.y, this.w, this.h);
-        this.sprite.draw(this.x + this.w, this.y, this.w, this.h);
+        topPipeSpr.draw(this.x, this.y, this.w, this.h);
+        botPipeSpr.draw(this.x, this.y + this.h + this.gap, this.w, this.h);
     }
-    update() {
-        this.x = (this.x + this.xSpeed) % (this.w / 2);
-        // this.x = (this.x + this.xSpeed); 
 
+    update() {
+        if (this.active) {
+            this.x += this.xSpeed;
+            if (this.x + this.w < 0) {
+                objectManager.unRegisterObject(this);
+                generatePipeObstacle(this.gap, this.maxYPos);
+            }
+        }
     }
+
 }
 
 
-//Background object
+
+//Object manager
+const objectManager = new ObjectManager();
+
+//Background objects
+//One background entity is too thin to cover whole screen so lets create two entities for that
 const backgroundSpr = new Sprite(image, 0, 0, 275, 226);
-const background = new Foreground(backgroundSpr, 0, 0, cvs.height - backgroundSpr.height,
+const backgroundLeft = new Entity(backgroundSpr, true, true, 0, cvs.height - backgroundSpr.height,
+    backgroundSpr.width, backgroundSpr.height);
+
+const backgroundRight = new Entity(backgroundSpr, true, true, backgroundSpr.width, cvs.height - backgroundSpr.height,
     backgroundSpr.width, backgroundSpr.height);
 
 //Foreground Object
 const foregroundSpr = new Sprite(image, 276, 0, 224, 112);
-const foreground = new Foreground(foregroundSpr, -2, 0, cvs.height - foregroundSpr.height,
+const foreground = new Foreground(foregroundSpr, false, true, -2, 0, cvs.height - foregroundSpr.height,
     foregroundSpr.width, foregroundSpr.height);
 
 //GetReady object
 const getReadySpr = new Sprite(image, 0, 228, 173, 152);
-const getReady = new Entity(getReadySpr, cvs.width / 2 - getReadySpr.width / 2, 100,
+const getReady = new Entity(getReadySpr, true, true, cvs.width / 2 - getReadySpr.width / 2, 100,
     getReadySpr.width, getReadySpr.height);
 
 //Game over object
 const gameOverSpr = new Sprite(image, 175, 228, 225, 202);
-const gameOver = new Entity(gameOverSpr, cvs.width / 2 - gameOverSpr.width / 2, 90, gameOverSpr.width, gameOverSpr.height);
+const gameOver = new Entity(gameOverSpr, false, false, cvs.width / 2 - gameOverSpr.width / 2, 90, gameOverSpr.width, gameOverSpr.height);
+
+
+const topPipeSpr = new Sprite(image, 554, 0, 52, 400);
+const botPipeSpr = new Sprite(image, 502, 0, 52, 400);
+
+
+
+function generatePipeObstacle(gap, maxYpos) {
+    let upperPipeYPos = maxYpos * (Math.random() + 1);
+    const generatedObstacle = new PipeObstacle(topPipeSpr, botPipeSpr, true, true, -2, gap, maxYpos, cvs.width, -upperPipeYPos,
+        topPipeSpr.width, topPipeSpr.height);
+
+    objectManager.registerObject(generatedObstacle);
+}
 
 //Bird
 const birdAnimCoords = [
@@ -148,7 +253,27 @@ const birdAnimCoords = [
     { x: 276, y: 139 }
 ];
 const birdSpr = new Sprite(image, 276, 112, 36, 26);
-const birdb = new Bird(birdSpr, birdAnimCoords, 50, 50, 34, 26);
+const birdb = new Bird(birdSpr, false, true, birdAnimCoords, 50, 50, 34, 26, 0, 0.25, 4.6);
+
+
+
+
+
+
+objectManager.registerObject(backgroundLeft);
+objectManager.registerObject(backgroundRight);
+
+
+
+objectManager.registerObject(foreground);
+objectManager.registerObject(birdb);
+
+objectManager.registerObject(gameOver);
+objectManager.registerObject(getReady);
+
+generatePipeObstacle(85, 150);
+
+
 // CONTROL THE GAME
 cvs.addEventListener("click", function (evt) {
 
@@ -156,12 +281,19 @@ cvs.addEventListener("click", function (evt) {
         case state.getReady:
             state.current = state.game;
             SWOOSHING.play();
+
+            getReady.visible = false;
+            birdb.active = true;
+            foreground.active = true;
             break;
+
         case state.game:
-            if (bird.y - bird.radius <= 0) return;
-            bird.flap();
+            // if (bird.y - bird.radius <= 0) return;
+            birdb.jump();
+            // bird.flap();
             FLAP.play();
             break;
+
         case state.over:
             let rect = cvs.getBoundingClientRect();
             let clickX = evt.clientX - rect.left;
@@ -171,85 +303,13 @@ cvs.addEventListener("click", function (evt) {
             if (clickX >= startBtn.x && clickX <= startBtn.x + startBtn.w && clickY >= startBtn.y &&
                 clickY <= startBtn.y + startBtn.h) {
                 pipes.reset();
-                bird.yVelocityReset();
+                // bird.yVelocityReset();
                 score.reset();
                 state.current = state.getReady;
             }
             break;
     }
 });
-
-// BIRD
-const bird = {
-    animation: [
-        { sX: 276, sY: 112 },
-        { sX: 276, sY: 139 },
-        { sX: 276, sY: 164 },
-        { sX: 276, sY: 139 }
-    ],
-    x: 50,
-    y: 150,
-    w: 34,
-    h: 26,
-
-    radius: 12,
-
-    frame: 0,
-
-    gravity: 0.25,
-    jump: 4.6,
-    yVelocity: 0,
-    rotation: 0,
-
-    render: function () {
-        let bird = this.animation[this.frame];
-
-        ctx.save();
-        ctx.translate(this.x, this.y);
-        ctx.rotate(this.rotation);
-        ctx.drawImage(image, bird.sX, bird.sY, this.w, this.h, - this.w / 2, - this.h / 2, this.w, this.h);
-
-        ctx.restore();
-    },
-
-    flap: function () {
-        this.yVelocity = - this.jump;
-    },
-
-    update: function () {
-        // IF THE GAME STATE IS GET READY STATE, THE BIRD MUST FLAP SLOWLY
-        this.period = state.current == state.getReady ? 10 : 5;
-        // WE INCREMENT THE FRAME BY 1, EACH PERIOD
-        this.frame += framesCount % this.period == 0 ? 1 : 0;
-        // FRAME GOES FROM 0 To 4, THEN AGAIN TO 0
-        this.frame = this.frame % this.animation.length;
-
-        if (state.current == state.getReady) {
-            this.y = 150; // RESET POSITION OF THE BIRD AFTER GAME OVER
-        } else {
-            this.yVelocity += this.gravity;
-            this.y += this.yVelocity;
-
-            if (this.y + this.h / 2 >= cvs.height - foreground.h) {
-                this.y = cvs.height - foreground.h - this.h / 2;
-                if (state.current == state.game) {
-                    state.current = state.over;
-                    DIE.play();
-                }
-            }
-            // IF THE yVelocity IS GREATER THAN THE JUMP MEANS THE BIRD IS FALLING DOWN
-            // if (this.yVelocity >= this.jump) {
-            //     this.rotation = 90 * DEGREE;
-            //     this.frame = 1;
-            // } else {
-            //     this.rotation = -25 * DEGREE;
-            // }
-        }
-    },
-    yVelocityReset: function () {
-        this.yVelocity = 0;
-    }
-}
 
 // PIPES
 const pipes = {
@@ -326,11 +386,9 @@ const pipes = {
             }
         }
     },
-
     reset: function () {
         this.position = [];
     }
-
 }
 
 // SCORE
@@ -366,37 +424,20 @@ const score = {
 
 // render
 function render() {
-    ctx.fillStyle = "#70c5ce";
-    ctx.fillRect(0, 0, cvs.width, cvs.height);
-
-    background.draw();
-    pipes.render();
-
-    foreground.draw();
-    bird.render();
-    birdb.draw();
-
-    if (state.current == state.getReady) {
-        getReady.draw();
-    }
-    else if (state.current == state.over) {
-        gameOver.draw();
-    }
     score.render();
-
 }
 // UPDATE
 function update() {
-    bird.update();
-    birdb.update();
-    if (state.current == state.game) {
-        foreground.update();
-    }
-    pipes.update();
 }
 
 // LOOP
 function loop() {
+
+    //NEW STUFF
+    objectManager.updateObjects();
+    objectManager.renderObjects();
+
+    //LEGACY
     update();
     render();
     framesCount++;
