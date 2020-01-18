@@ -27,8 +27,6 @@ const DIE = new Audio();
 DIE.src = "audio/sfx_die.wav";
 
 
-
-
 // GAME STATE
 const state = {
     current: 0,
@@ -69,17 +67,40 @@ class Sprite {
 
 class Entity {
     constructor(sprite, x, y, w, h) {
+        this.sprite = sprite;
         this.x = x;
         this.y = y;
         this.w = w;
         this.h = h;
-        this.sprite = sprite;
     }
     update() {
 
     }
     draw() {
         this.sprite.draw(this.x, this.y, this.w, this.h);
+    }
+}
+
+
+class Bird extends Entity {
+    constructor(sprite, animationCoords, x, y, w, h) {
+
+        super(sprite, x, y, w, h);
+
+        this.animationCoords = animationCoords;
+        this.animFrame = 0;
+    }
+    update() {
+        // IF THE GAME STATE IS GET READY STATE, THE BIRD MUST FLAP SLOWLY
+        this.period = state.current == state.getReady ? 10 : 5;
+        // WE INCREMENT THE FRAME BY 1, EACH PERIOD
+        this.animFrame += framesCount % this.period == 0 ? 1 : 0;
+        // FRAME GOES FROM 0 To 4, THEN AGAIN TO 0
+        this.animFrame = this.animFrame % this.animationCoords.length;
+
+        this.sprite.imageX = this.animationCoords[this.animFrame].x;
+        this.sprite.imageY = this.animationCoords[this.animFrame].y;
+
     }
 }
 
@@ -94,27 +115,40 @@ class Foreground extends Entity {
     }
     update() {
         this.x = (this.x + this.xSpeed) % (this.w / 2);
+        // this.x = (this.x + this.xSpeed); 
+
     }
 }
 
-//Background objects, there are two backgrounds because one is not wide enough
+
+//Background object
 const backgroundSpr = new Sprite(image, 0, 0, 275, 226);
-const bgLeft = new Entity(backgroundSpr, 0, cvs.height - backgroundSpr.height, backgroundSpr.width, backgroundSpr.height);
-const bgRight = new Entity(backgroundSpr, backgroundSpr.width, cvs.height - backgroundSpr.height,
+const background = new Foreground(backgroundSpr, 0, 0, cvs.height - backgroundSpr.height,
     backgroundSpr.width, backgroundSpr.height);
+
+//Foreground Object
+const foregroundSpr = new Sprite(image, 276, 0, 224, 112);
+const foreground = new Foreground(foregroundSpr, -2, 0, cvs.height - foregroundSpr.height,
+    foregroundSpr.width, foregroundSpr.height);
 
 //GetReady object
 const getReadySpr = new Sprite(image, 0, 228, 173, 152);
 const getReady = new Entity(getReadySpr, cvs.width / 2 - getReadySpr.width / 2, 100,
     getReadySpr.width, getReadySpr.height);
 
-//Foreground Object
-const foregroundSpr = new Sprite(image, 276, 0, 224, 112);
-const fgLeft = new Foreground(foregroundSpr, -2, 0, cvs.height - foregroundSpr.height, foregroundSpr.width, foregroundSpr.height);
+//Game over object
+const gameOverSpr = new Sprite(image, 175, 228, 225, 202);
+const gameOver = new Entity(gameOverSpr, cvs.width / 2 - gameOverSpr.width / 2, 90, gameOverSpr.width, gameOverSpr.height);
 
-
-
-
+//Bird
+const birdAnimCoords = [
+    { x: 276, y: 112 },
+    { x: 276, y: 139 },
+    { x: 276, y: 164 },
+    { x: 276, y: 139 }
+];
+const birdSpr = new Sprite(image, 276, 112, 36, 26);
+const birdb = new Bird(birdSpr, birdAnimCoords, 50, 50, 34, 26);
 // CONTROL THE GAME
 cvs.addEventListener("click", function (evt) {
 
@@ -196,8 +230,8 @@ const bird = {
             this.yVelocity += this.gravity;
             this.y += this.yVelocity;
 
-            if (this.y + this.h / 2 >= cvs.height - fg.h) {
-                this.y = cvs.height - fg.h - this.h / 2;
+            if (this.y + this.h / 2 >= cvs.height - foreground.h) {
+                this.y = cvs.height - foreground.h - this.h / 2;
                 if (state.current == state.game) {
                     state.current = state.over;
                     DIE.play();
@@ -211,28 +245,10 @@ const bird = {
             //     this.rotation = -25 * DEGREE;
             // }
         }
-
     },
     yVelocityReset: function () {
         this.yVelocity = 0;
     }
-}
-
-// GAME OVER MESSAGE
-const gameOver = {
-    sX: 175,
-    sY: 228,
-    w: 225,
-    h: 202,
-    x: cvs.width / 2 - 225 / 2,
-    y: 90,
-
-    render: function () {
-        if (state.current == state.over) {
-            ctx.drawImage(image, this.sX, this.sY, this.w, this.h, this.x, this.y, this.w, this.h);
-        }
-    }
-
 }
 
 // PIPES
@@ -353,25 +369,28 @@ function render() {
     ctx.fillStyle = "#70c5ce";
     ctx.fillRect(0, 0, cvs.width, cvs.height);
 
-    bgLeft.draw();
-    bgRight.draw();
+    background.draw();
     pipes.render();
 
-    fgLeft.draw();
+    foreground.draw();
     bird.render();
-    gameOver.render();
-    score.render();
+    birdb.draw();
 
     if (state.current == state.getReady) {
         getReady.draw();
     }
+    else if (state.current == state.over) {
+        gameOver.draw();
+    }
+    score.render();
+
 }
 // UPDATE
 function update() {
     bird.update();
-    // fg.update();
+    birdb.update();
     if (state.current == state.game) {
-        fgLeft.update();
+        foreground.update();
     }
     pipes.update();
 }
