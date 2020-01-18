@@ -7,8 +7,8 @@ let framesCount = 0;
 const DEGREE = Math.PI / 180;
 
 // LOAD SPRITE IMAGE
-const sprite = new Image();
-sprite.src = "img/sprite.png";
+const image = new Image();
+image.src = "img/sprite.png";
 
 // LOAD SOUNDS
 const SCORE_S = new Audio();
@@ -25,6 +25,9 @@ SWOOSHING.src = "audio/sfx_swooshing.wav";
 
 const DIE = new Audio();
 DIE.src = "audio/sfx_die.wav";
+
+
+
 
 // GAME STATE
 const state = {
@@ -65,14 +68,28 @@ class Sprite {
 }
 
 class Entity {
-    constructor(x, y, w, h, sprite) {
+    constructor(sprite, x, y, w, h) {
         this.x = x;
         this.y = y;
         this.w = w;
         this.h = h;
         this.sprite = sprite;
     }
+    draw() {
+        this.sprite.draw(this.x, this.y, this.w, this.h);
+    }
 }
+
+//Background objects, there are two backgrounds because one is not wide enough
+const backgroundSpr = new Sprite(image, 0, 0, 275, 226);
+const bgLeft = new Entity(backgroundSpr, 0, cvs.height - backgroundSpr.height, backgroundSpr.width, backgroundSpr.height);
+const bgRight = new Entity(backgroundSpr, backgroundSpr.width, cvs.height - backgroundSpr.height,
+    backgroundSpr.width, backgroundSpr.height);
+
+//GetReady object
+const getReadySpr = new Sprite(image, 0, 228, 173, 152);
+const getReady = new Entity(getReadySpr, cvs.width / 2 - getReadySpr.width / 2, 100,
+    getReadySpr.width, getReadySpr.height);
 
 // CONTROL THE GAME
 cvs.addEventListener("click", function (evt) {
@@ -115,9 +132,9 @@ const bg = {
     y: cvs.height - 226,
 
     render: function () {
-        ctx.drawImage(sprite, this.sX, this.sY, this.w, this.h, this.x, this.y, this.w, this.h);
+        ctx.drawImage(image, this.sX, this.sY, this.w, this.h, this.x, this.y, this.w, this.h);
 
-        ctx.drawImage(sprite, this.sX, this.sY, this.w, this.h, this.x + this.w, this.y, this.w, this.h);
+        ctx.drawImage(image, this.sX, this.sY, this.w, this.h, this.x + this.w, this.y, this.w, this.h);
     }
 }
 
@@ -133,9 +150,9 @@ const fg = {
     dx: 2,
 
     render: function () {
-        ctx.drawImage(sprite, this.sX, this.sY, this.w, this.h, this.x, this.y, this.w, this.h);
+        ctx.drawImage(image, this.sX, this.sY, this.w, this.h, this.x, this.y, this.w, this.h);
 
-        ctx.drawImage(sprite, this.sX, this.sY, this.w, this.h, this.x + this.w, this.y, this.w, this.h);
+        ctx.drawImage(image, this.sX, this.sY, this.w, this.h, this.x + this.w, this.y, this.w, this.h);
     },
 
     update: function () {
@@ -173,7 +190,7 @@ const bird = {
         ctx.save();
         ctx.translate(this.x, this.y);
         ctx.rotate(this.rotation);
-        ctx.drawImage(sprite, bird.sX, bird.sY, this.w, this.h, - this.w / 2, - this.h / 2, this.w, this.h);
+        ctx.drawImage(image, bird.sX, bird.sY, this.w, this.h, - this.w / 2, - this.h / 2, this.w, this.h);
 
         ctx.restore();
     },
@@ -218,23 +235,6 @@ const bird = {
     }
 }
 
-// GET READY MESSAGE
-const getReady = {
-    sX: 0,
-    sY: 228,
-    w: 173,
-    h: 152,
-    x: cvs.width / 2 - 173 / 2,
-    y: 80,
-
-    render: function () {
-        if (state.current == state.getReady) {
-            ctx.drawImage(sprite, this.sX, this.sY, this.w, this.h, this.x, this.y, this.w, this.h);
-        }
-    }
-
-}
-
 // GAME OVER MESSAGE
 const gameOver = {
     sX: 175,
@@ -246,7 +246,7 @@ const gameOver = {
 
     render: function () {
         if (state.current == state.over) {
-            ctx.drawImage(sprite, this.sX, this.sY, this.w, this.h, this.x, this.y, this.w, this.h);
+            ctx.drawImage(image, this.sX, this.sY, this.w, this.h, this.x, this.y, this.w, this.h);
         }
     }
 
@@ -279,10 +279,10 @@ const pipes = {
             let bottomYPos = p.y + this.h + this.gap;
 
             // top pipe
-            ctx.drawImage(sprite, this.top.sX, this.top.sY, this.w, this.h, p.x, topYPos, this.w, this.h);
+            ctx.drawImage(image, this.top.sX, this.top.sY, this.w, this.h, p.x, topYPos, this.w, this.h);
 
             // bottom pipe
-            ctx.drawImage(sprite, this.bottom.sX, this.bottom.sY, this.w, this.h, p.x, bottomYPos, this.w, this.h);
+            ctx.drawImage(image, this.bottom.sX, this.bottom.sY, this.w, this.h, p.x, bottomYPos, this.w, this.h);
         }
     },
 
@@ -365,18 +365,22 @@ const score = {
     }
 }
 
-// DRAW
+// render
 function render() {
     ctx.fillStyle = "#70c5ce";
     ctx.fillRect(0, 0, cvs.width, cvs.height);
 
-    bg.render();
+    bgLeft.draw();
+    bgRight.draw();
     pipes.render();
     fg.render();
     bird.render();
-    getReady.render();
     gameOver.render();
     score.render();
+
+    if (state.current == state.getReady) {
+        getReady.draw();
+    }
 }
 // UPDATE
 function update() {
