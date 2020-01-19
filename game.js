@@ -26,13 +26,23 @@ SWOOSHING.src = "audio/sfx_swooshing.wav";
 const DIE = new Audio();
 DIE.src = "audio/sfx_die.wav";
 
+birdVars = {
+    startX: 50,
+    startY: 50,
+    animFrames: [
+        frame0 = { x: 276, y: 112 },
+        frame1 = { x: 276, y: 139 },
+        frame2 = { x: 276, y: 164 }]
+}
+
+
 
 // GAME STATE
 const state = {
     current: 0,
     getReady: 0,
     game: 1,
-    over: 2
+    gameOver: 2
 };
 
 // START BUTTON COORD
@@ -77,11 +87,12 @@ class Sprite {
 }
 
 // =====================================================================================================
-// --------------------------------------/ Object Manager /---------------------------------------------
+// --------------------------------------/ Game Manager /---------------------------------------------
 // =====================================================================================================
 
-class ObjectManager {
+class GameManager {
     constructor() {
+        this.gameState = null;
         this.objects = [];
         this.colliders = [];
     }
@@ -94,6 +105,10 @@ class ObjectManager {
                 this.registerCollider(element);
             });
         }
+    }
+    getObjectsByName(name) {
+        let objectsWithName = this.objects.filter(obj => obj.name === name);
+        return objectsWithName;
     }
 
     unRegisterObject(object) {
@@ -127,6 +142,7 @@ class ObjectManager {
             element.update();
         });
     }
+
     checkCollision(colliderOne, colliderTwo, onCollision) {
         let xCheck = colliderOne.x < colliderTwo.x + colliderTwo.width &&
             colliderOne.x + colliderOne.width > colliderTwo.x;
@@ -154,9 +170,9 @@ class ObjectManager {
     }
 }
 
-
 class Entity {
-    constructor(sprite, active, visible, x, y, w, h) {
+    constructor(name, sprite, active, visible, x, y, w, h) {
+        this.name = name;
         this.sprite = sprite;
         this.x = x;
         this.y = y;
@@ -189,8 +205,8 @@ class Entity {
 // =====================================================================================================
 
 class Foreground extends Entity {
-    constructor(sprite, active, visible, xSpeed, x, y, w, h) {
-        super(sprite, active, visible, x, y, w, h);
+    constructor(name, sprite, active, visible, xSpeed, x, y, w, h) {
+        super(name, sprite, active, visible, x, y, w, h);
         this.xSpeed = xSpeed;
         this.colliders.push(new BoxCollider("foreground", w, h, x, y));
     }
@@ -214,8 +230,8 @@ class Foreground extends Entity {
 }
 
 class Bird extends Entity {
-    constructor(sprite, active, visible, animationCoords, x, y, w, h, yVelocity, gravity, jumpForce) {
-        super(sprite, active, visible, x, y, w, h);
+    constructor(name, sprite, active, visible, animationCoords, x, y, w, h, yVelocity, gravity, jumpForce) {
+        super(name, sprite, active, visible, x, y, w, h);
         this.animationCoords = animationCoords;
         this.animFrame = 0;
         this.yVelocity = yVelocity;
@@ -247,6 +263,11 @@ class Bird extends Entity {
             this.yVelocity += this.gravity;
             this.y += this.yVelocity;
 
+            if (this.y + this.h / 2 >= foreground.y) {
+                this.y = foreground.y - this.h / 2;
+            } else if (this.y < 0) {
+                this.y = 0;
+            }
             this.updateColliders();
         }
     }
@@ -254,9 +275,9 @@ class Bird extends Entity {
 
 
 class PipeObstacle extends Entity {
-    constructor(topPipeSpr, botPipeSpr, active, visible, xSpeed, gap, maxYPos, x, y, w, h) {
+    constructor(name, topPipeSpr, botPipeSpr, active, visible, xSpeed, gap, maxYPos, x, y, w, h) {
 
-        super(null, active, visible, x, y, w, h);
+        super(name, null, active, visible, x, y, w, h);
         this.xSpeed = xSpeed;
 
         this.gap = gap;
@@ -304,39 +325,37 @@ class PipeObstacle extends Entity {
     }
 }
 
-
-
 // =====================================================================================================
 // --------------------------------------/ Initializing objects /---------------------------------------
 // =====================================================================================================
 
 // Object manager
-const objectManager = new ObjectManager();
+const objectManager = new GameManager();
 
 // Background
 // one background entity is too thin to cover whole screen
 // lets create two entities with the same sprite for that
 const backgroundSpr = new Sprite(image, 0, 0, 275, 226);
 
-const backgroundLeft = new Entity(backgroundSpr, true, true, 0, cvs.height - backgroundSpr.height,
+const backgroundLeft = new Entity("backgroundLeft", backgroundSpr, true, true, 0, cvs.height - backgroundSpr.height,
     backgroundSpr.width, backgroundSpr.height);
 
-const backgroundRight = new Entity(backgroundSpr, true, true, backgroundSpr.width, cvs.height - backgroundSpr.height,
+const backgroundRight = new Entity("backgroundRight", backgroundSpr, true, true, backgroundSpr.width, cvs.height - backgroundSpr.height,
     backgroundSpr.width, backgroundSpr.height);
 
 // Foreground 
 const foregroundSpr = new Sprite(image, 276, 0, 224, 112);
-const foreground = new Foreground(foregroundSpr, false, true, -2, 0, cvs.height - foregroundSpr.height,
+const foreground = new Foreground("foreground", foregroundSpr, false, true, -2, 0, cvs.height - foregroundSpr.height,
     foregroundSpr.width, foregroundSpr.height);
 
 // GetReady
 const getReadySpr = new Sprite(image, 0, 228, 173, 152);
-const getReady = new Entity(getReadySpr, true, true, cvs.width / 2 - getReadySpr.width / 2, 100,
+const getReady = new Entity("getReady", getReadySpr, true, true, cvs.width / 2 - getReadySpr.width / 2, 100,
     getReadySpr.width, getReadySpr.height);
 
-// Game over
+// Game gameOver
 const gameOverSpr = new Sprite(image, 175, 228, 225, 202);
-const gameOver = new Entity(gameOverSpr, false, false, cvs.width / 2 - gameOverSpr.width / 2, 90, gameOverSpr.width, gameOverSpr.height);
+const gameOver = new Entity("gameOver", gameOverSpr, false, false, cvs.width / 2 - gameOverSpr.width / 2, 90, gameOverSpr.width, gameOverSpr.height);
 
 
 // Pipe Sprites
@@ -344,15 +363,9 @@ const topPipeSpr = new Sprite(image, 554, 0, 52, 400);
 const botPipeSpr = new Sprite(image, 502, 0, 52, 400);
 
 
-// Bird
-const birdAnimCoords = [
-    { x: 276, y: 112 },
-    { x: 276, y: 139 },
-    { x: 276, y: 164 },
-    { x: 276, y: 139 }
-];
-const birdSpr = new Sprite(image, 276, 112, 36, 26);
-const bird = new Bird(birdSpr, false, true, birdAnimCoords, 50, 50, 34, 26, 0, 0.25, 4.6);
+
+const birdSpr = new Sprite(image, frame0.x, frame0.y, 36, 26);
+const bird = new Bird("bird", birdSpr, false, true, birdVars.animFrames, birdVars.startX, birdVars.startY, 34, 26, 0, 0.25, 4.6);
 
 
 objectManager.registerObject(backgroundLeft);
@@ -361,13 +374,12 @@ objectManager.registerObject(backgroundRight);
 objectManager.registerObject(foreground);
 objectManager.registerObject(bird);
 
-objectManager.registerObject(gameOver);
 objectManager.registerObject(getReady);
 
 
 function generatePipeObstacle(gap, maxYpos) {
     let upperPipeYPos = maxYpos * (Math.random() + 1);
-    const generatedObstacle = new PipeObstacle(topPipeSpr, botPipeSpr, true, true, -2, gap, maxYpos, cvs.width, -upperPipeYPos,
+    const generatedObstacle = new PipeObstacle("pipeObstacle", topPipeSpr, botPipeSpr, true, true, -2, gap, maxYpos, cvs.width, -upperPipeYPos,
         topPipeSpr.width, topPipeSpr.height);
 
     objectManager.registerObject(generatedObstacle);
@@ -399,7 +411,7 @@ cvs.addEventListener("click", function (evt) {
             FLAP.play();
             break;
 
-        case state.over:
+        case state.gameOver:
             let rect = cvs.getBoundingClientRect();
             let clickX = evt.clientX - rect.left;
             let clickY = evt.clientY - rect.top;
@@ -407,94 +419,11 @@ cvs.addEventListener("click", function (evt) {
             // CHECK IF WE CLICK ON THE START BUTTON
             if (clickX >= startBtn.x && clickX <= startBtn.x + startBtn.w && clickY >= startBtn.y &&
                 clickY <= startBtn.y + startBtn.h) {
-                pipes.reset();
-                // bird.yVelocityReset();
-                score.reset();
-                state.current = state.getReady;
+                RestartGame();
             }
             break;
     }
 });
-
-// PIPES
-const pipes = {
-    position: [],
-
-    top: {
-        sX: 553,
-        sY: 0
-    },
-    bottom: {
-        sX: 502,
-        sY: 0
-    },
-
-    w: 53,
-    h: 400,
-    gap: 85,
-    maxYPos: -150,
-    dx: 2,
-
-    render: function () {
-        for (let i = 0; i < this.position.length; i++) {
-            let p = this.position[i];
-
-            let topYPos = p.y;
-            let bottomYPos = p.y + this.h + this.gap;
-
-            // top pipe
-            ctx.drawImage(image, this.top.sX, this.top.sY, this.w, this.h, p.x, topYPos, this.w, this.h);
-
-            // bottom pipe
-            ctx.drawImage(image, this.bottom.sX, this.bottom.sY, this.w, this.h, p.x, bottomYPos, this.w, this.h);
-        }
-    },
-
-    update: function () {
-        if (state.current !== state.game) return;
-
-        if (framesCount % 100 == 0) {
-            this.position.push({
-                x: cvs.width,
-                y: this.maxYPos * (Math.random() + 1)
-            });
-        }
-        for (let i = 0; i < this.position.length; i++) {
-            let p = this.position[i];
-
-            let bottomPipeYPos = p.y + this.h + this.gap;
-
-            // COLLISION DETECTION
-            // TOP PIPE
-            if (bird.x + bird.radius > p.x && bird.x - bird.radius < p.x + this.w &&
-                bird.y + bird.radius > p.y && bird.y - bird.radius < p.y + this.h) {
-                state.current = state.over;
-                HIT.play();
-            }
-            // BOTTOM PIPE
-            if (bird.x + bird.radius > p.x && bird.x - bird.radius < p.x + this.w &&
-                bird.y + bird.radius > bottomPipeYPos && bird.y - bird.radius < bottomPipeYPos + this.h) {
-                state.current = state.over;
-                HIT.play();
-            }
-
-            // MOVE THE PIPES TO THE LEFT
-            p.x -= this.dx;
-
-            // if the pipes go beyond canvas, we delete them from the array
-            if (p.x + this.w <= 0) {
-                this.position.shift();
-                score.value += 1;
-                SCORE_S.play();
-                score.best = Math.max(score.value, score.best);
-                localStorage.setItem("best", score.best);
-            }
-        }
-    },
-    reset: function () {
-        this.position = [];
-    }
-}
 
 // SCORE
 const score = {
@@ -511,7 +440,7 @@ const score = {
             ctx.fillText(this.value, cvs.width / 2, 50);
             ctx.strokeText(this.value, cvs.width / 2, 50);
 
-        } else if (state.current == state.over) {
+        } else if (state.current == state.gameOver) {
             // SCORE VALUE
             ctx.font = "25px Teko";
             ctx.fillText(this.value, 225, 186);
@@ -531,15 +460,45 @@ function render() {
     score.render();
 }
 
+function RestartGame() {
+    state.current = state.getReady;
+
+    bird.active = false;
+    getReady.visible = true;
+    gameOver.visible = false;
+
+    bird.x = birdVars.startX;
+    bird.y = birdVars.startY;
+
+
+}
+function unregisterPipes() {
+    let pipes = objectManager.getObjectsByName("pipeObstacle");
+    pipes.forEach(element => {
+        objectManager.unRegisterObject(element);
+    });
+}
+
+function ShowDeathScreen() {
+
+    state.current = state.gameOver;
+    bird.colliders[0].active = false;
+    foreground.active = false;
+    objectManager.registerObject(gameOver);
+    let pipes = objectManager.getObjectsByName("pipeObstacle");
+    pipes.forEach(element => {
+        element.active = false;
+    });
+    gameOver.visible = true;
+}
+
 // =====================================================================================================
 // --------------------------------------/ Collision Callbacks /----------------------------------------
 // =====================================================================================================
 
 function onBirdDeath(collided, collider) {
     HIT.play();
-    collided.active = false;
-    foreground.active = false;
-    state.current = state.over;
+    ShowDeathScreen();
 }
 
 function onIncreaseScore(collided, collider) {
@@ -548,6 +507,11 @@ function onIncreaseScore(collided, collider) {
     score.best = Math.max(score.value, score.best);
     localStorage.setItem("best", score.best);
     collider.active = false;
+}
+
+function onBirdHitFloor(collided, collider) {
+    DIE.play();
+    ShowDeathScreen();
 }
 
 
@@ -561,6 +525,7 @@ function loop() {
     objectManager.renderObjects();
 
     objectManager.checkCollisionByTag(bird.colliders[0], "obstacle", onBirdDeath);
+    objectManager.checkCollisionByTag(bird.colliders[0], "foreground", onBirdHitFloor);
     objectManager.checkCollisionByTag(bird.colliders[0], "scoreIncreaser", onIncreaseScore);
 
     //LEGACY
