@@ -91,7 +91,8 @@ class Sprite {
 
 class GameManager {
     constructor() {
-        this.bestScore = parseInt(localStorage.getItem("best")) || 0;
+        this.bestScore = parseInt(localStorage.getItem("bestScore")) || 0;
+        this.currentScore = 0;
         this.objects = [];
         this.colliders = [];
     }
@@ -110,12 +111,12 @@ class GameManager {
         return objectsWithName;
     }
 
-    unRegisterObject(object) {
+    deregisterObject(object) {
         this.objects = this.objects.filter(obj => obj !== object);
         //unregister colliders of the objects;
         if (object.colliders != null) {
             object.colliders.forEach(element => {
-                this.unregisterCollider(element);
+                this.deregisterCollider(element);
             });
         }
     }
@@ -124,7 +125,7 @@ class GameManager {
         this.colliders.push(collider);
     }
 
-    unregisterCollider(collider) {
+    deregisterCollider(collider) {
         this.colliders = this.colliders.filter(obj => obj !== collider);
     }
 
@@ -171,6 +172,8 @@ class GameManager {
     }
 }
 
+
+
 class Entity {
     constructor(name, sprite, active, visible, x, y, w, h) {
         this.name = name;
@@ -204,6 +207,48 @@ class Entity {
 // =====================================================================================================
 // --------------------------------------/ Classes that extend Entity /---------------------------------
 // =====================================================================================================
+
+class Arrow extends Entity {
+    constructor(name, sprite, active, visible, ySpeed, x, y, w, h) {
+        super(name, sprite, active, visible, x, y, w, h);
+        this.ySpeed = ySpeed;
+        this.colliders.push(new BoxCollider("arrow", w, h, this.x, this.y));
+        this.currentFrame = framesCount;
+    }
+    update() {
+        if (this.active) {
+            this.y += this.ySpeed;
+            this.updateColliders();
+            if (framesCount - this.currentFrame > 15) {
+                this.destroySelf();
+            }
+        }
+    }
+    destroySelf() {
+        gameManager.deregisterObject(this);
+    }
+}
+
+class CustomText extends Entity {
+    constructor(name, text, x, y, visible, font) {
+        super(name, null, null, null, x, y, null, null);
+        this.text = text;
+        this.x = x;
+        this.y = y;
+        this.visible = visible;
+        this.font = font;
+    }
+
+    draw() {
+        if (this.visible) {
+            ctx.fillStyle = "#FFF";
+            ctx.strokeStyle = "#000";
+            ctx.font = this.font;
+            ctx.fillText(this.text, this.x, this.y);
+            ctx.strokeText(this.text, this.x, this.y);
+        }
+    }
+}
 
 class Foreground extends Entity {
     constructor(name, sprite, active, visible, xSpeed, x, y, w, h) {
@@ -271,6 +316,7 @@ class Bird extends Entity {
             }
             this.updateColliders();
         }
+
     }
 }
 
@@ -320,31 +366,13 @@ class PipeObstacle extends Entity {
             this.updateColliders();
 
             if (this.x + this.w < 0) {
-                objectManager.unRegisterObject(this);
+                gameManager.deregisterObject(this);
                 generatePipeObstacle(this.gap, this.maxYPos);
             }
         }
     }
 }
 
-class CustomText {
-    constructor(text, x, y, visible) {
-        this.text = text;
-        this.x = x;
-        this.y = y;
-        this.visible = visible;
-    }
-
-    draw() {
-        if (this.visible) {
-            ctx.fillStyle = "#FFF";
-            ctx.strokeStyle = "#000";
-            ctx.font = "35px Teko";
-            ctx.fillText(this.text, this.x, this.y);
-            ctx.strokeText(this.text, this.x, this.y);
-        }
-    }
-}
 
 // =====================================================================================================
 // --------------------------------------/ Game-related functions /-------------------------------------
@@ -354,12 +382,15 @@ function CheckMouseClickOnStart(clickX, clickY) {
         clickY <= startBtn.y + startBtn.h);
 }
 
+function ShootArrow(x, y) {
+    arrow = new Arrow("arrow", arrowSpr, true, true, -15, x, y, arrowSpr.width, arrowSpr.height);
+    gameManager.registerObject(arrow);
+}
 
-
-function unregisterPipes() {
-    let pipes = objectManager.getObjectsByName("pipeObstacle");
+function deregisterPipes() {
+    let pipes = gameManager.getObjectsByName("pipeObstacle");
     pipes.forEach(element => {
-        objectManager.unRegisterObject(element);
+        gameManager.deregisterObject(element);
     });
 }
 // =====================================================================================================
@@ -375,11 +406,13 @@ function StartGame() {
 
     bird.active = true;
     foreground.active = true;
-    scoreText.visible = true;
+    playerScore.visible = true;
 }
 
 function RestartGame() {
     state.current = state.getReady;
+
+    //reset bird variables to defaults
     bird.yVelocity = 0;
     bird.active = false;
     bird.x = birdVars.startX;
@@ -388,19 +421,35 @@ function RestartGame() {
     getReady.visible = true;
     gameOver.visible = false;
 
-    unregisterPipes();
+    playerScore.text = 0;
+    gameManager.currentScore = 0;
+    //stop rendering and updating pipe entities that are in the game
+    deregisterPipes();
+    // deregister end and best scores
+    gameManager.deregisterObject(gameManager.getObjectsByName("endScore")[0]);
+    gameManager.deregisterObject(gameManager.getObjectsByName("bestScore")[0]);
+
 }
 
 
 function ShowDeathScreen() {
     state.current = state.gameOver;
+
     foreground.active = false;
-    objectManager.registerObject(gameOver);
-    let pipes = objectManager.getObjectsByName("pipeObstacle");
+    gameManager.registerObject(gameOver);
+    gameOver.visible = true;
+
+    endScore = new CustomText("endScore", gameManager.currentScore, 225, 186, true, "25px Teko");
+    gameManager.registerObject(endScore);
+
+    bestScore = new CustomText("bestScore", gameManager.bestScore, 225, 228, true, "25px Teko");
+    gameManager.registerObject(bestScore);
+    let pipes = gameManager.getObjectsByName("pipeObstacle");
     pipes.forEach(element => {
         element.active = false;
     });
-    gameOver.visible = true;
+
+
 }
 
 
@@ -409,7 +458,7 @@ function ShowDeathScreen() {
 // =====================================================================================================
 
 // Object manager
-const objectManager = new GameManager();
+const gameManager = new GameManager();
 
 // Background
 // one background entity is too thin to cover whole screen
@@ -436,26 +485,28 @@ const getReady = new Entity("getReady", getReadySpr, true, true, cvs.width / 2 -
 const gameOverSpr = new Sprite(image, 175, 228, 225, 202);
 const gameOver = new Entity("gameOver", gameOverSpr, false, false, cvs.width / 2 - gameOverSpr.width / 2, 90, gameOverSpr.width, gameOverSpr.height);
 
-const scoreText = new CustomText(0, cvs.clientWidth / 2, 50, false);
+const playerScore = new CustomText("currentScore", 0, cvs.clientWidth / 2, 50, false, "35px Teko");
 
 // Pipe Sprites
 const topPipeSpr = new Sprite(image, 554, 0, 52, 400);
 const botPipeSpr = new Sprite(image, 502, 0, 52, 400);
 
+//Arrow Sprite
+const arrowSpr = new Sprite(image, 431, 119, 6, 29);
 
 
 const birdSpr = new Sprite(image, frame0.x, frame0.y, 36, 26);
 const bird = new Bird("bird", birdSpr, false, true, birdVars.animFrames, birdVars.startX, birdVars.startY, 34, 26, 0, 0.25, 4.6);
 
 
-objectManager.registerObject(backgroundLeft);
-objectManager.registerObject(backgroundRight);
+gameManager.registerObject(backgroundLeft);
+gameManager.registerObject(backgroundRight);
 
-objectManager.registerObject(scoreText);
-objectManager.registerObject(foreground);
-objectManager.registerObject(bird);
+gameManager.registerObject(playerScore);
+gameManager.registerObject(foreground);
+gameManager.registerObject(bird);
 
-objectManager.registerObject(getReady);
+gameManager.registerObject(getReady);
 
 
 function generatePipeObstacle(gap, maxYpos) {
@@ -463,7 +514,7 @@ function generatePipeObstacle(gap, maxYpos) {
     const generatedObstacle = new PipeObstacle("pipeObstacle", topPipeSpr, botPipeSpr, true, true, -2, gap, maxYpos, cvs.width, -upperPipeYPos,
         topPipeSpr.width, topPipeSpr.height);
 
-    objectManager.registerObject(generatedObstacle);
+    gameManager.registerObject(generatedObstacle);
 }
 
 
@@ -480,6 +531,7 @@ cvs.addEventListener("click", function (evt) {
         case state.game:
             bird.jump();
             FLAP.play();
+            ShootArrow(bird.x + bird.w / 2, bird.y - bird.h);
             break;
 
         case state.gameOver:
@@ -493,43 +545,6 @@ cvs.addEventListener("click", function (evt) {
     }
 });
 
-
-// SCORE
-const score = {
-    best: parseInt(localStorage.getItem("best")) || 0,
-    value: 0,
-
-    render: function () {
-        ctx.fillStyle = "#FFF";
-
-
-        if (state.current == state.game) {
-            ctx.lineWidth = 2;
-            ctx.font = "35px Teko";
-            ctx.fillText(this.value, cvs.width / 2, 50);
-            ctx.strokeText(this.value, cvs.width / 2, 50);
-
-        } else if (state.current == state.gameOver) {
-            // SCORE VALUE
-            ctx.font = "25px Teko";
-            ctx.fillText(this.value, 225, 186);
-            ctx.strokeText(this.value, 225, 186);
-            // BEST SCORE
-            ctx.fillText(this.best, 225, 228);
-            ctx.strokeText(this.best, 225, 228);
-        }
-    },
-
-    reset: function () {
-        this.value = 0;
-    }
-}
-
-function render() {
-    score.render();
-}
-
-
 // =====================================================================================================
 // --------------------------------------/ Collision Callbacks /----------------------------------------
 // =====================================================================================================
@@ -540,10 +555,13 @@ function onBirdDeath(collided, collider) {
 }
 
 function onIncreaseScore(collided, collider) {
-    score.value += 1;
+    gameManager.currentScore += 1;
+    playerScore.text = gameManager.currentScore;
     SCORE_S.play();
-    score.best = Math.max(score.value, score.best);
-    localStorage.setItem("best", score.best);
+    if (gameManager.currentScore > gameManager.bestScore) {
+        gameManager.bestScore = gameManager.currentScore;
+        localStorage.setItem("bestScore", gameManager.bestScore);
+    }
     collider.active = false;
 }
 
@@ -553,24 +571,21 @@ function onBirdHitFloor(collided, collider) {
 }
 
 function checkCollisions() {
-    objectManager.checkCollisionByTag(bird.colliders[0], "obstacle", onBirdDeath);
-    objectManager.checkCollisionByTag(bird.colliders[0], "foreground", onBirdHitFloor);
-    objectManager.checkCollisionByTag(bird.colliders[0], "scoreIncreaser", onIncreaseScore);
+    gameManager.checkCollisionByTag(bird.colliders[0], "obstacle", onBirdDeath);
+    gameManager.checkCollisionByTag(bird.colliders[0], "foreground", onBirdHitFloor);
+    gameManager.checkCollisionByTag(bird.colliders[0], "scoreIncreaser", onIncreaseScore);
 }
 
 // =====================================================================================================
 // --------------------------------------/ GameLoop /---------------------------------------------------
 // =====================================================================================================
 function loop() {
-    objectManager.updateObjects();
-    objectManager.renderObjects();
+    gameManager.updateObjects();
+    gameManager.renderObjects();
 
     if (state.current == state.game) {
         checkCollisions();
     }
-
-    //LEGACY
-    // render();
 
     framesCount++;
     requestAnimationFrame(loop);
