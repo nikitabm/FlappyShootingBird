@@ -36,7 +36,6 @@ birdVars = {
 }
 
 
-
 // GAME STATE
 const state = {
     current: 0,
@@ -92,7 +91,7 @@ class Sprite {
 
 class GameManager {
     constructor() {
-        this.gameState = null;
+        this.bestScore = parseInt(localStorage.getItem("best")) || 0;
         this.objects = [];
         this.colliders = [];
     }
@@ -139,7 +138,9 @@ class GameManager {
 
     updateObjects() {
         this.objects.forEach(element => {
-            element.update();
+            if (element.update != null) {
+                element.update();
+            }
         });
     }
 
@@ -295,6 +296,7 @@ class PipeObstacle extends Entity {
         this.colliders.push(this.botPipeCollider);
         this.colliders.push(this.scoreCollider);
     }
+
     updateColliders() {
         this.topPipeCollider.x = this.x;
         this.topPipeCollider.y = this.topPipeY;
@@ -324,6 +326,83 @@ class PipeObstacle extends Entity {
         }
     }
 }
+
+class CustomText {
+    constructor(text, x, y, visible) {
+        this.text = text;
+        this.x = x;
+        this.y = y;
+        this.visible = visible;
+    }
+
+    draw() {
+        if (this.visible) {
+            ctx.fillStyle = "#FFF";
+            ctx.strokeStyle = "#000";
+            ctx.font = "35px Teko";
+            ctx.fillText(this.text, this.x, this.y);
+            ctx.strokeText(this.text, this.x, this.y);
+        }
+    }
+}
+
+// =====================================================================================================
+// --------------------------------------/ Game-related functions /-------------------------------------
+// =====================================================================================================
+function CheckMouseClickOnStart(clickX, clickY) {
+    return (clickX >= startBtn.x && clickX <= startBtn.x + startBtn.w && clickY >= startBtn.y &&
+        clickY <= startBtn.y + startBtn.h);
+}
+
+
+
+function unregisterPipes() {
+    let pipes = objectManager.getObjectsByName("pipeObstacle");
+    pipes.forEach(element => {
+        objectManager.unRegisterObject(element);
+    });
+}
+// =====================================================================================================
+// --------------------------------------/ Game State functions /---------------------------------------
+// =====================================================================================================
+
+function StartGame() {
+    state.current = state.game;
+    SWOOSHING.play();
+
+    getReady.visible = false;
+    generatePipeObstacle(95, 150);
+
+    bird.active = true;
+    foreground.active = true;
+    scoreText.visible = true;
+}
+
+function RestartGame() {
+    state.current = state.getReady;
+    bird.yVelocity = 0;
+    bird.active = false;
+    bird.x = birdVars.startX;
+    bird.y = birdVars.startY;
+
+    getReady.visible = true;
+    gameOver.visible = false;
+
+    unregisterPipes();
+}
+
+
+function ShowDeathScreen() {
+    state.current = state.gameOver;
+    foreground.active = false;
+    objectManager.registerObject(gameOver);
+    let pipes = objectManager.getObjectsByName("pipeObstacle");
+    pipes.forEach(element => {
+        element.active = false;
+    });
+    gameOver.visible = true;
+}
+
 
 // =====================================================================================================
 // --------------------------------------/ Initializing objects /---------------------------------------
@@ -357,6 +436,7 @@ const getReady = new Entity("getReady", getReadySpr, true, true, cvs.width / 2 -
 const gameOverSpr = new Sprite(image, 175, 228, 225, 202);
 const gameOver = new Entity("gameOver", gameOverSpr, false, false, cvs.width / 2 - gameOverSpr.width / 2, 90, gameOverSpr.width, gameOverSpr.height);
 
+const scoreText = new CustomText(0, cvs.clientWidth / 2, 50, false);
 
 // Pipe Sprites
 const topPipeSpr = new Sprite(image, 554, 0, 52, 400);
@@ -371,6 +451,7 @@ const bird = new Bird("bird", birdSpr, false, true, birdVars.animFrames, birdVar
 objectManager.registerObject(backgroundLeft);
 objectManager.registerObject(backgroundRight);
 
+objectManager.registerObject(scoreText);
 objectManager.registerObject(foreground);
 objectManager.registerObject(bird);
 
@@ -391,23 +472,13 @@ function generatePipeObstacle(gap, maxYpos) {
 // =====================================================================================================
 
 cvs.addEventListener("click", function (evt) {
-
     switch (state.current) {
         case state.getReady:
-            state.current = state.game;
-            SWOOSHING.play();
-
-            getReady.visible = false;
-            generatePipeObstacle(95, 150);
-
-            bird.active = true;
-            foreground.active = true;
+            StartGame();
             break;
 
         case state.game:
-            // if (bird.y - bird.radius <= 0) return;
             bird.jump();
-            // bird.flap();
             FLAP.play();
             break;
 
@@ -415,15 +486,13 @@ cvs.addEventListener("click", function (evt) {
             let rect = cvs.getBoundingClientRect();
             let clickX = evt.clientX - rect.left;
             let clickY = evt.clientY - rect.top;
-
-            // CHECK IF WE CLICK ON THE START BUTTON
-            if (clickX >= startBtn.x && clickX <= startBtn.x + startBtn.w && clickY >= startBtn.y &&
-                clickY <= startBtn.y + startBtn.h) {
+            if (CheckMouseClickOnStart(clickX, clickY)) {
                 RestartGame();
             }
             break;
     }
 });
+
 
 // SCORE
 const score = {
@@ -432,7 +501,7 @@ const score = {
 
     render: function () {
         ctx.fillStyle = "#FFF";
-        ctx.strokeStyle = "#000";
+
 
         if (state.current == state.game) {
             ctx.lineWidth = 2;
@@ -460,38 +529,6 @@ function render() {
     score.render();
 }
 
-function RestartGame() {
-    state.current = state.getReady;
-
-    bird.active = false;
-    bird.x = birdVars.startX;
-    bird.y = birdVars.startY;
-
-    getReady.visible = true;
-    gameOver.visible = false;
-
-    unregisterPipes();
-}
-
-function unregisterPipes() {
-    let pipes = objectManager.getObjectsByName("pipeObstacle");
-    pipes.forEach(element => {
-        objectManager.unRegisterObject(element);
-    });
-}
-
-function ShowDeathScreen() {
-
-    state.current = state.gameOver;
-    bird.colliders[0].active = false;
-    foreground.active = false;
-    objectManager.registerObject(gameOver);
-    let pipes = objectManager.getObjectsByName("pipeObstacle");
-    pipes.forEach(element => {
-        element.active = false;
-    });
-    gameOver.visible = true;
-}
 
 // =====================================================================================================
 // --------------------------------------/ Collision Callbacks /----------------------------------------
@@ -515,24 +552,27 @@ function onBirdHitFloor(collided, collider) {
     ShowDeathScreen();
 }
 
-
+function checkCollisions() {
+    objectManager.checkCollisionByTag(bird.colliders[0], "obstacle", onBirdDeath);
+    objectManager.checkCollisionByTag(bird.colliders[0], "foreground", onBirdHitFloor);
+    objectManager.checkCollisionByTag(bird.colliders[0], "scoreIncreaser", onIncreaseScore);
+}
 
 // =====================================================================================================
 // --------------------------------------/ GameLoop /---------------------------------------------------
 // =====================================================================================================
 function loop() {
-    //NEW STUFF
     objectManager.updateObjects();
     objectManager.renderObjects();
 
-    objectManager.checkCollisionByTag(bird.colliders[0], "obstacle", onBirdDeath);
-    objectManager.checkCollisionByTag(bird.colliders[0], "foreground", onBirdHitFloor);
-    objectManager.checkCollisionByTag(bird.colliders[0], "scoreIncreaser", onIncreaseScore);
+    if (state.current == state.game) {
+        checkCollisions();
+    }
 
     //LEGACY
-    render();
-    framesCount++;
+    // render();
 
+    framesCount++;
     requestAnimationFrame(loop);
 }
 loop();
