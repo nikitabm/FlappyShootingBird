@@ -1,16 +1,55 @@
-// SELECT CVS
+
+// =====================================================================================================
+// -----------------------------------------/ Canvas and Context /--------------------------------------
+// =====================================================================================================
+
 const cvs = document.getElementById("gameCanvas");
 const ctx = cvs.getContext("2d");
 
-// GAME VARS AND CONSTS
-let framesCount = 0;
-const DEGREE = Math.PI / 180;
+// =====================================================================================================
+// -----------------------------------------/ Game Variables /------------------------------------------
+// =====================================================================================================
 
-// LOAD SPRITE IMAGE
+// save number of frames
+let framesCount = 0;
+
+// keep track of shooting direction of a player
+let shootingDirection = 0;
+
+// load sprite image
 const image = new Image();
 image.src = "img/sprite.png";
 
-// LOAD SOUNDS
+// bird variables
+const startX = 50;
+const startY = 50;
+
+const animFrames = [
+    frame0 = { x: 276, y: 112 },
+    frame1 = { x: 276, y: 139 },
+    frame2 = { x: 276, y: 164 }];
+
+// game state
+const state = {
+    current: 0,
+    getReady: 0,
+    game: 1,
+    gameOver: 2
+};
+
+// coordinates of start button
+const startBtn = {
+    x: 120,
+    y: 263,
+    w: 83,
+    h: 29
+};
+
+
+// =====================================================================================================
+// --------------------------------------------/ Load Sounds /------------------------------------------
+// =====================================================================================================
+
 const SCORE_S = new Audio();
 SCORE_S.src = "audio/sfx_point.wav";
 
@@ -26,40 +65,10 @@ SWOOSHING.src = "audio/sfx_swooshing.wav";
 const DIE = new Audio();
 DIE.src = "audio/sfx_die.wav";
 
-let shootingDirection = 0;
-
-birdVars = {
-    startX: 50,
-    startY: 50,
-    animFrames: [
-        frame0 = { x: 276, y: 112 },
-        frame1 = { x: 276, y: 139 },
-        frame2 = { x: 276, y: 164 }]
-}
-
-
-// GAME STATE
-const state = {
-    current: 0,
-    getReady: 0,
-    game: 1,
-    gameOver: 2
-};
-
-// START BUTTON COORD
-const startBtn = {
-    x: 120,
-    y: 263,
-    w: 83,
-    h: 29
-};
-
 
 // =====================================================================================================
 // --------------------------------------/ Classes Definition /-----------------------------------------
 // =====================================================================================================
-
-
 
 class BoxCollider {
     constructor(tag, width, height, x, y) {
@@ -88,7 +97,7 @@ class Sprite {
 }
 
 // =====================================================================================================
-// --------------------------------------/ Game Manager /---------------------------------------------
+// --------------------------------------/ Game Manager /-----------------------------------------------
 // =====================================================================================================
 
 class GameManager {
@@ -174,7 +183,9 @@ class GameManager {
     }
 }
 
-
+// =====================================================================================================
+// --------------------------------------------/ Entity /-----------------------------------------------
+// =====================================================================================================
 
 class Entity {
     constructor(name, sprite, active, visible, x, y, w, h) {
@@ -225,7 +236,7 @@ class ShootingTarget extends Entity {
             this.x += this.xSpeed; // move shooting target
             // if target is outside the screen move it to the random position between two incomming pipes
             if (this.x + this.w < 0) {
-                this.x = (cvs.clientWidth) * 1;
+                this.x = gameManager.getObjectsByName("pipeObstacle")[0].x + cvs.clientWidth / 2;
             }
             this.updateColliders(); // update position of the collider
         }
@@ -406,7 +417,7 @@ class PipeObstacle extends Entity {
 // =====================================================================================================
 // --------------------------------------/ Game-related functions /-------------------------------------
 // =====================================================================================================
-function CheckMouseClickOnStart(clickX, clickY) {
+function checkMouseClickOnStart(clickX, clickY) {
     return (clickX >= startBtn.x && clickX <= startBtn.x + startBtn.w && clickY >= startBtn.y &&
         clickY <= startBtn.y + startBtn.h);
 }
@@ -424,7 +435,6 @@ function shootArrow(x, y, speed) {
 
     arrow = new Arrow("arrow", arrowSpr, true, true, speed, x, y, arrowSpr.width, arrowSpr.height);
     gameManager.registerObject(arrow);
-    shootingDirection
 }
 
 function deregisterPipes() {
@@ -437,7 +447,7 @@ function deregisterPipes() {
 // --------------------------------------/ Game State functions /---------------------------------------
 // =====================================================================================================
 
-function StartGame() {
+function startGame() {
     // set state of the game
     state.current = state.game;
 
@@ -462,7 +472,7 @@ function StartGame() {
     playerScore.visible = true;
 }
 
-function RestartGame() {
+function restartGame() {
 
     // set state of the game
     state.current = state.getReady;
@@ -478,7 +488,7 @@ function RestartGame() {
     gameOver.visible = false;
 
     // reset shooting target
-    shootingTarget.x = cvs.clientWidth;
+    shootingTarget.x = cvs.clientWidth * 1.5;
 
     // stop rendering and updating pipe entities that are in the game
     deregisterPipes();
@@ -494,7 +504,7 @@ function RestartGame() {
 }
 
 
-function ShowDeathScreen() {
+function showDeathScreen() {
     state.current = state.gameOver;
 
     foreground.active = false;
@@ -530,8 +540,8 @@ const backgroundSpr = new Sprite(image, 0, 0, 275, 226);
 const backgroundLeft = new Entity("backgroundLeft", backgroundSpr, true, true, 0, cvs.height - backgroundSpr.height,
     backgroundSpr.width, backgroundSpr.height);
 
-const backgroundRight = new Entity("backgroundRight", backgroundSpr, true, true, backgroundSpr.width, cvs.height - backgroundSpr.height,
-    backgroundSpr.width, backgroundSpr.height);
+const backgroundRight = new Entity("backgroundRight", backgroundSpr, true, true, backgroundSpr.width,
+    cvs.height - backgroundSpr.height, backgroundSpr.width, backgroundSpr.height);
 
 // Foreground 
 const foregroundSpr = new Sprite(image, 276, 0, 224, 112);
@@ -561,13 +571,12 @@ const arrowSpr = new Sprite(image, 431, 119, 6, 29);
 const shootingTargetSpr = new Sprite(image, 415, 170, 57, 7);
 
 const shootingTarget = new ShootingTarget("shootingTarget", shootingTargetSpr, false, true,
-    -2, cvs.clientWidth * 1.7, 30, shootingTargetSpr.width / 2, shootingTargetSpr.height);
-
+    -2, cvs.clientWidth * 1.5, 30, shootingTargetSpr.width / 2, shootingTargetSpr.height);
 
 
 // Bird 
 const birdSpr = new Sprite(image, frame0.x, frame0.y, 36, 26);
-const bird = new Bird("bird", birdSpr, false, true, birdVars.animFrames, birdVars.startX, birdVars.startY, 34, 26, 0, 0.25, 4.6);
+const bird = new Bird("bird", birdSpr, false, true, animFrames, startX, startY, 34, 26, 0, 0.25, 4.6);
 
 
 //Registering Objects to game manager
@@ -590,7 +599,7 @@ gameManager.registerObject(getReady);
 cvs.addEventListener("click", function (evt) {
     switch (state.current) {
         case state.getReady:
-            StartGame();
+            startGame();
             break;
 
         case state.game:
@@ -615,8 +624,9 @@ cvs.addEventListener("click", function (evt) {
             let rect = cvs.getBoundingClientRect();
             let clickX = evt.clientX - rect.left;
             let clickY = evt.clientY - rect.top;
-            if (CheckMouseClickOnStart(clickX, clickY)) {
-                RestartGame();
+
+            if (checkMouseClickOnStart(clickX, clickY)) {
+                restartGame();
             }
             break;
     }
@@ -628,7 +638,7 @@ cvs.addEventListener("click", function (evt) {
 
 function onBirdDeath(collided, collider) {
     HIT.play();
-    ShowDeathScreen();
+    showDeathScreen();
 }
 
 function onIncreaseScore(collided, collider) {
@@ -644,7 +654,7 @@ function onIncreaseScore(collided, collider) {
 
 function onBirdHitFloor(collided, collider) {
     DIE.play();
-    ShowDeathScreen();
+    showDeathScreen();
 }
 
 
