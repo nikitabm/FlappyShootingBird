@@ -43,10 +43,21 @@ const startBtn = {
     h: 29
 };
 
+
+// =====================================================================================================
+// --------------------------------------/ Classes Definition /-----------------------------------------
+// =====================================================================================================
+
+
+
 class BoxCollider {
-    constructor(width, height) {
+    constructor(tag, width, height, x, y) {
+        this.tag = tag;
         this.width = width;
         this.height = height;
+        this.x = x;
+        this.y = y;
+        this.active = true;
     }
 }
 
@@ -65,6 +76,85 @@ class Sprite {
     }
 }
 
+// =====================================================================================================
+// --------------------------------------/ Object Manager /---------------------------------------------
+// =====================================================================================================
+
+class ObjectManager {
+    constructor() {
+        this.objects = [];
+        this.colliders = [];
+    }
+
+    registerObject(object) {
+        this.objects.push(object);
+
+        if (object.colliders != null) {
+            object.colliders.forEach(element => {
+                this.registerCollider(element);
+            });
+        }
+    }
+
+    unRegisterObject(object) {
+        this.objects = this.objects.filter(obj => obj !== object);
+        //unregister colliders of the objects;
+        if (object.colliders != null) {
+            object.colliders.forEach(element => {
+                this.unregisterCollider(element);
+            });
+        }
+    }
+
+    registerCollider(collider) {
+        this.colliders.push(collider);
+    }
+
+    unregisterCollider(collider) {
+        this.colliders = this.colliders.filter(obj => obj !== collider);
+    }
+
+    renderObjects() {
+        ctx.fillStyle = "#70c5ce";
+        ctx.fillRect(0, 0, cvs.width, cvs.height);
+        this.objects.forEach(element => {
+            element.draw();
+        });
+    }
+
+    updateObjects() {
+        this.objects.forEach(element => {
+            element.update();
+        });
+    }
+    checkCollision(colliderOne, colliderTwo, onCollision) {
+        let xCheck = colliderOne.x < colliderTwo.x + colliderTwo.width &&
+            colliderOne.x + colliderOne.width > colliderTwo.x;
+
+        let yCheck = colliderOne.y < colliderTwo.y + colliderTwo.height &&
+            colliderOne.y + colliderOne.height > colliderTwo.y;
+
+        if (xCheck && yCheck) {
+            if (onCollision != null) {
+                onCollision(colliderOne, colliderTwo);
+            }
+        }
+    }
+
+    checkCollisionByTag(collider, tag, onCollision) {
+        if (!collider.active) return;
+
+        this.colliders.forEach(element => {
+            if (element != collider && element.active) {
+                if (element.tag == tag) {
+                    this.checkCollision(collider, element, onCollision);
+                }
+            }
+        });
+    }
+}
+
+
 class Entity {
     constructor(sprite, active, visible, x, y, w, h) {
         this.sprite = sprite;
@@ -74,7 +164,16 @@ class Entity {
         this.h = h;
         this.active = active;
         this.visible = visible;
+        this.colliders = [];
     }
+
+    updateColliders() {
+        this.colliders.forEach(collider => {
+            collider.x = this.x;
+            collider.y = this.y;
+        });
+    }
+
     update() { }
 
     draw() {
@@ -84,35 +183,45 @@ class Entity {
     }
 }
 
+
+// =====================================================================================================
+// --------------------------------------/ Classes that extend Entity /---------------------------------
+// =====================================================================================================
+
 class Foreground extends Entity {
-    constructor(sprite, active, visible, xSpeed, x, y, w, h, boxColliderW, boxColliderH) {
+    constructor(sprite, active, visible, xSpeed, x, y, w, h) {
         super(sprite, active, visible, x, y, w, h);
         this.xSpeed = xSpeed;
-        this.boxCollider = new BoxCollider(boxColliderW, boxColliderH);
+        this.colliders.push(new BoxCollider("foreground", w, h, x, y));
     }
+
     draw() {
         if (this.visible) {
             this.sprite.draw(this.x, this.y, this.w, this.h);
             this.sprite.draw(this.x + this.w, this.y, this.w, this.h);
         }
     }
+
     update() {
         if (this.active) {
             this.x = (this.x + this.xSpeed) % (this.w / 2);
+
+            //updating colliders of the foreground is not needed
+            //The foreground gets created right under the bird, there is no need to move collider of the foreground
+            // this.updateColliders();
         }
     }
 }
 
 class Bird extends Entity {
     constructor(sprite, active, visible, animationCoords, x, y, w, h, yVelocity, gravity, jumpForce) {
-
         super(sprite, active, visible, x, y, w, h);
-
         this.animationCoords = animationCoords;
         this.animFrame = 0;
         this.yVelocity = yVelocity;
         this.gravity = gravity;
         this.jumpForce = jumpForce;
+        this.colliders.push(new BoxCollider("bird", w, h, x, y));
     }
 
     setAnimationFrame() {
@@ -137,115 +246,105 @@ class Bird extends Entity {
         if (this.active) {
             this.yVelocity += this.gravity;
             this.y += this.yVelocity;
+
+            this.updateColliders();
         }
     }
 }
-
-class ObjectManager {
-
-    constructor() {
-        this.objects = [];
-        this.colliders = [];
-    }
-    registerObject(object) {
-        this.objects.push(object);
-    }
-
-    unRegisterObject(object) {
-        this.objects = this.objects.filter(obj => obj !== object);
-    }
-
-    registerCollider(collider) {
-
-    }
-    unRegisterCollider(collider) {
-
-    }
-
-    renderObjects() {
-        ctx.fillStyle = "#70c5ce";
-        ctx.fillRect(0, 0, cvs.width, cvs.height);
-        this.objects.forEach(element => {
-            element.draw();
-        });
-    }
-    updateObjects() {
-        this.objects.forEach(element => {
-            element.update();
-        });
-    }
-}
-
 
 
 class PipeObstacle extends Entity {
     constructor(topPipeSpr, botPipeSpr, active, visible, xSpeed, gap, maxYPos, x, y, w, h) {
 
-        super(topPipeSpr, active, visible, x, y, w, h);
+        super(null, active, visible, x, y, w, h);
         this.xSpeed = xSpeed;
+
         this.gap = gap;
         this.maxYPos = maxYPos;
+
+        this.topPipeY = this.y;
+        this.bottomPipeY = this.y + this.h + this.gap;
+
+        this.topPipeCollider = new BoxCollider("obstacle", this.w, this.h, this.x, this.topPipeY);
+        this.botPipeCollider = new BoxCollider("obstacle", this.w, this.h, this.x, this.BottomPipeY);
+
+        this.scoreCollider = new BoxCollider("scoreIncreaser", 5, this.gap, this.x + this.w, this.y + this.h);
+
+        this.colliders.push(this.topPipeCollider);
+        this.colliders.push(this.botPipeCollider);
+        this.colliders.push(this.scoreCollider);
     }
+    updateColliders() {
+        this.topPipeCollider.x = this.x;
+        this.topPipeCollider.y = this.topPipeY;
+
+        this.botPipeCollider.x = this.x;
+        this.botPipeCollider.y = this.bottomPipeY;
+
+        this.scoreCollider.x = this.x + this.w;
+        this.scoreCollider.y = this.y + this.h;
+    }
+
     draw() {
-        topPipeSpr.draw(this.x, this.y, this.w, this.h);
-        botPipeSpr.draw(this.x, this.y + this.h + this.gap, this.w, this.h);
+        topPipeSpr.draw(this.x, this.topPipeY, this.w, this.h);
+        botPipeSpr.draw(this.x, this.bottomPipeY, this.w, this.h);
     }
 
     update() {
         if (this.active) {
             this.x += this.xSpeed;
+
+            this.updateColliders();
+
             if (this.x + this.w < 0) {
                 objectManager.unRegisterObject(this);
                 generatePipeObstacle(this.gap, this.maxYPos);
             }
         }
     }
-
 }
 
 
 
-//Object manager
+// =====================================================================================================
+// --------------------------------------/ Initializing objects /---------------------------------------
+// =====================================================================================================
+
+// Object manager
 const objectManager = new ObjectManager();
 
-//Background objects
-//One background entity is too thin to cover whole screen so lets create two entities for that
+// Background
+// one background entity is too thin to cover whole screen
+// lets create two entities with the same sprite for that
 const backgroundSpr = new Sprite(image, 0, 0, 275, 226);
+
 const backgroundLeft = new Entity(backgroundSpr, true, true, 0, cvs.height - backgroundSpr.height,
     backgroundSpr.width, backgroundSpr.height);
 
 const backgroundRight = new Entity(backgroundSpr, true, true, backgroundSpr.width, cvs.height - backgroundSpr.height,
     backgroundSpr.width, backgroundSpr.height);
 
-//Foreground Object
+// Foreground 
 const foregroundSpr = new Sprite(image, 276, 0, 224, 112);
 const foreground = new Foreground(foregroundSpr, false, true, -2, 0, cvs.height - foregroundSpr.height,
     foregroundSpr.width, foregroundSpr.height);
 
-//GetReady object
+// GetReady
 const getReadySpr = new Sprite(image, 0, 228, 173, 152);
 const getReady = new Entity(getReadySpr, true, true, cvs.width / 2 - getReadySpr.width / 2, 100,
     getReadySpr.width, getReadySpr.height);
 
-//Game over object
+// Game over
 const gameOverSpr = new Sprite(image, 175, 228, 225, 202);
 const gameOver = new Entity(gameOverSpr, false, false, cvs.width / 2 - gameOverSpr.width / 2, 90, gameOverSpr.width, gameOverSpr.height);
 
 
+// Pipe Sprites
 const topPipeSpr = new Sprite(image, 554, 0, 52, 400);
 const botPipeSpr = new Sprite(image, 502, 0, 52, 400);
 
 
-
-function generatePipeObstacle(gap, maxYpos) {
-    let upperPipeYPos = maxYpos * (Math.random() + 1);
-    const generatedObstacle = new PipeObstacle(topPipeSpr, botPipeSpr, true, true, -2, gap, maxYpos, cvs.width, -upperPipeYPos,
-        topPipeSpr.width, topPipeSpr.height);
-
-    objectManager.registerObject(generatedObstacle);
-}
-
-//Bird
+// Bird
 const birdAnimCoords = [
     { x: 276, y: 112 },
     { x: 276, y: 139 },
@@ -254,7 +353,6 @@ const birdAnimCoords = [
 ];
 const birdSpr = new Sprite(image, 276, 112, 36, 26);
 const bird = new Bird(birdSpr, false, true, birdAnimCoords, 50, 50, 34, 26, 0, 0.25, 4.6);
-
 
 
 objectManager.registerObject(backgroundLeft);
@@ -267,8 +365,19 @@ objectManager.registerObject(gameOver);
 objectManager.registerObject(getReady);
 
 
+function generatePipeObstacle(gap, maxYpos) {
+    let upperPipeYPos = maxYpos * (Math.random() + 1);
+    const generatedObstacle = new PipeObstacle(topPipeSpr, botPipeSpr, true, true, -2, gap, maxYpos, cvs.width, -upperPipeYPos,
+        topPipeSpr.width, topPipeSpr.height);
 
-// CONTROL THE GAME
+    objectManager.registerObject(generatedObstacle);
+}
+
+
+// =====================================================================================================
+// --------------------------------------/ Click Listener /---------------------------------------------
+// =====================================================================================================
+
 cvs.addEventListener("click", function (evt) {
 
     switch (state.current) {
@@ -277,7 +386,7 @@ cvs.addEventListener("click", function (evt) {
             SWOOSHING.play();
 
             getReady.visible = false;
-            generatePipeObstacle(85, 150);
+            generatePipeObstacle(95, 150);
 
             bird.active = true;
             foreground.active = true;
@@ -418,23 +527,43 @@ const score = {
     }
 }
 
-// render
 function render() {
     score.render();
 }
-// UPDATE
-function update() {
+
+// =====================================================================================================
+// --------------------------------------/ Collision Callbacks /----------------------------------------
+// =====================================================================================================
+
+function onBirdDeath(collided, collider) {
+    HIT.play();
+    collided.active = false;
+    foreground.active = false;
+    state.current = state.over;
 }
 
-// LOOP
-function loop() {
+function onIncreaseScore(collided, collider) {
+    score.value += 1;
+    SCORE_S.play();
+    score.best = Math.max(score.value, score.best);
+    localStorage.setItem("best", score.best);
+    collider.active = false;
+}
 
+
+
+// =====================================================================================================
+// --------------------------------------/ GameLoop /---------------------------------------------------
+// =====================================================================================================
+function loop() {
     //NEW STUFF
     objectManager.updateObjects();
     objectManager.renderObjects();
 
+    objectManager.checkCollisionByTag(bird.colliders[0], "obstacle", onBirdDeath);
+    objectManager.checkCollisionByTag(bird.colliders[0], "scoreIncreaser", onIncreaseScore);
+
     //LEGACY
-    update();
     render();
     framesCount++;
 
