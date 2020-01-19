@@ -26,6 +26,8 @@ SWOOSHING.src = "audio/sfx_swooshing.wav";
 const DIE = new Audio();
 DIE.src = "audio/sfx_die.wav";
 
+let shootingDirection = 0;
+
 birdVars = {
     startX: 50,
     startY: 50,
@@ -113,7 +115,7 @@ class GameManager {
 
     deregisterObject(object) {
         this.objects = this.objects.filter(obj => obj !== object);
-        //unregister colliders of the objects;
+        // unregister colliders of the objects;
         if (object.colliders != null) {
             object.colliders.forEach(element => {
                 this.deregisterCollider(element);
@@ -208,22 +210,49 @@ class Entity {
 // --------------------------------------/ Classes that extend Entity /---------------------------------
 // =====================================================================================================
 
+class ShootingTarget extends Entity {
+    constructor(name, sprite, active, visible, xSpeed, x, y, w, h) {
+        super(name, sprite, active, visible, x, y, w, h);
+        this.xSpeed = xSpeed;
+
+        // create collider
+        this.colliders.push(new BoxCollider("shootingTarget", w, h, this.x, this.y));
+    }
+
+    update() {
+        if (this.active) {
+
+            this.x += this.xSpeed; // move shooting target
+            // if target is outside the screen move it to the random position between two incomming pipes
+            if (this.x + this.w < 0) {
+                this.x = (cvs.clientWidth) * 1;
+            }
+            this.updateColliders(); // update position of the collider
+        }
+    }
+
+}
 class Arrow extends Entity {
     constructor(name, sprite, active, visible, ySpeed, x, y, w, h) {
         super(name, sprite, active, visible, x, y, w, h);
         this.ySpeed = ySpeed;
+        this.currentFrame = framesCount;// save frame to keep track of "lifetime" of arrow
+        // create collider
         this.colliders.push(new BoxCollider("arrow", w, h, this.x, this.y));
-        this.currentFrame = framesCount;
     }
+
     update() {
         if (this.active) {
             this.y += this.ySpeed;
+
             this.updateColliders();
+            // destroy arrow after  15 frames in the game
             if (framesCount - this.currentFrame > 15) {
                 this.destroySelf();
             }
         }
     }
+
     destroySelf() {
         gameManager.deregisterObject(this);
     }
@@ -268,8 +297,8 @@ class Foreground extends Entity {
         if (this.active) {
             this.x = (this.x + this.xSpeed) % (this.w / 2);
 
-            //updating colliders of the foreground is not needed
-            //The foreground gets created right under the bird, there is no need to move collider of the foreground
+            // updating colliders of the foreground is not needed
+            // The foreground gets created right under the bird, there is no need to move collider of the foreground
             // this.updateColliders();
         }
     }
@@ -382,9 +411,20 @@ function CheckMouseClickOnStart(clickX, clickY) {
         clickY <= startBtn.y + startBtn.h);
 }
 
-function ShootArrow(x, y) {
-    arrow = new Arrow("arrow", arrowSpr, true, true, -15, x, y, arrowSpr.width, arrowSpr.height);
+
+function generatePipeObstacle(gap, maxYpos) {
+    let upperPipeYPos = maxYpos * (Math.random() + 1);
+    const generatedObstacle = new PipeObstacle("pipeObstacle", topPipeSpr, botPipeSpr, true, true, -2, gap, maxYpos, cvs.width, -upperPipeYPos,
+        topPipeSpr.width, topPipeSpr.height);
+
+    gameManager.registerObject(generatedObstacle);
+}
+
+function shootArrow(x, y, speed) {
+
+    arrow = new Arrow("arrow", arrowSpr, true, true, speed, x, y, arrowSpr.width, arrowSpr.height);
     gameManager.registerObject(arrow);
+    shootingDirection
 }
 
 function deregisterPipes() {
@@ -398,36 +438,58 @@ function deregisterPipes() {
 // =====================================================================================================
 
 function StartGame() {
+    // set state of the game
     state.current = state.game;
+
     SWOOSHING.play();
 
+    // hide get ready screen
     getReady.visible = false;
+
+    //activate bird
+    bird.active = true;
+
+    //generate first pipe obstacle
     generatePipeObstacle(95, 150);
 
-    bird.active = true;
+    //enable shooting target
+    shootingTarget.active = true;
+
+    //activate foreground
     foreground.active = true;
+
+    //show playerScore
     playerScore.visible = true;
 }
 
 function RestartGame() {
+
+    // set state of the game
     state.current = state.getReady;
 
-    //reset bird variables to defaults
+    // reset bird variables to defaults
     bird.yVelocity = 0;
     bird.active = false;
     bird.x = birdVars.startX;
     bird.y = birdVars.startY;
 
+    // show get ready screen, hide game over screen
     getReady.visible = true;
     gameOver.visible = false;
 
-    playerScore.text = 0;
-    gameManager.currentScore = 0;
-    //stop rendering and updating pipe entities that are in the game
+    // reset shooting target
+    shootingTarget.x = cvs.clientWidth;
+
+    // stop rendering and updating pipe entities that are in the game
     deregisterPipes();
+
     // deregister end and best scores
     gameManager.deregisterObject(gameManager.getObjectsByName("endScore")[0]);
     gameManager.deregisterObject(gameManager.getObjectsByName("bestScore")[0]);
+
+    // reset current score
+    playerScore.text = 0;
+    gameManager.currentScore = 0;
 
 }
 
@@ -438,7 +500,7 @@ function ShowDeathScreen() {
     foreground.active = false;
     gameManager.registerObject(gameOver);
     gameOver.visible = true;
-
+    shootingTarget.active = false;
     endScore = new CustomText("endScore", gameManager.currentScore, 225, 186, true, "25px Teko");
     gameManager.registerObject(endScore);
 
@@ -491,31 +553,34 @@ const playerScore = new CustomText("currentScore", 0, cvs.clientWidth / 2, 50, f
 const topPipeSpr = new Sprite(image, 554, 0, 52, 400);
 const botPipeSpr = new Sprite(image, 502, 0, 52, 400);
 
-//Arrow Sprite
+// Arrow Sprite
 const arrowSpr = new Sprite(image, 431, 119, 6, 29);
 
 
+// Shooting target
+const shootingTargetSpr = new Sprite(image, 415, 170, 57, 7);
+
+const shootingTarget = new ShootingTarget("shootingTarget", shootingTargetSpr, false, true,
+    -2, cvs.clientWidth * 1.7, 30, shootingTargetSpr.width / 2, shootingTargetSpr.height);
+
+
+
+// Bird 
 const birdSpr = new Sprite(image, frame0.x, frame0.y, 36, 26);
 const bird = new Bird("bird", birdSpr, false, true, birdVars.animFrames, birdVars.startX, birdVars.startY, 34, 26, 0, 0.25, 4.6);
 
 
+//Registering Objects to game manager
 gameManager.registerObject(backgroundLeft);
 gameManager.registerObject(backgroundRight);
-
 gameManager.registerObject(playerScore);
 gameManager.registerObject(foreground);
+gameManager.registerObject(shootingTarget);
+
 gameManager.registerObject(bird);
 
 gameManager.registerObject(getReady);
 
-
-function generatePipeObstacle(gap, maxYpos) {
-    let upperPipeYPos = maxYpos * (Math.random() + 1);
-    const generatedObstacle = new PipeObstacle("pipeObstacle", topPipeSpr, botPipeSpr, true, true, -2, gap, maxYpos, cvs.width, -upperPipeYPos,
-        topPipeSpr.width, topPipeSpr.height);
-
-    gameManager.registerObject(generatedObstacle);
-}
 
 
 // =====================================================================================================
@@ -531,7 +596,19 @@ cvs.addEventListener("click", function (evt) {
         case state.game:
             bird.jump();
             FLAP.play();
-            ShootArrow(bird.x + bird.w / 2, bird.y - bird.h);
+
+            // switch direction of shooting with every click
+            let arrowSpeed = 15;
+            if (shootingDirection == 0) {
+                shootingDirection = 1;
+                arrowSpeed *= 1;
+            } else if (shootingDirection == 1) {
+                shootingDirection = 0;
+                arrowSpeed *= -1;
+            }
+
+            // shoot arrow
+            shootArrow(bird.x + bird.w / 2, bird.y - bird.h, arrowSpeed);
             break;
 
         case state.gameOver:
@@ -570,7 +647,9 @@ function onBirdHitFloor(collided, collider) {
     ShowDeathScreen();
 }
 
+
 function checkCollisions() {
+    gameManager.checkCollisionByTag(shootingTarget.colliders[0], "arrow", onIncreaseScore);
     gameManager.checkCollisionByTag(bird.colliders[0], "obstacle", onBirdDeath);
     gameManager.checkCollisionByTag(bird.colliders[0], "foreground", onBirdHitFloor);
     gameManager.checkCollisionByTag(bird.colliders[0], "scoreIncreaser", onIncreaseScore);
@@ -586,7 +665,6 @@ function loop() {
     if (state.current == state.game) {
         checkCollisions();
     }
-
     framesCount++;
     requestAnimationFrame(loop);
 }
