@@ -464,14 +464,15 @@ function RestartGame() {
     state.current = state.getReady;
 
     bird.active = false;
-    getReady.visible = true;
-    gameOver.visible = false;
-
     bird.x = birdVars.startX;
     bird.y = birdVars.startY;
 
+    getReady.visible = true;
+    gameOver.visible = false;
 
+    unregisterPipes();
 }
+
 function unregisterPipes() {
     let pipes = objectManager.getObjectsByName("pipeObstacle");
     pipes.forEach(element => {
