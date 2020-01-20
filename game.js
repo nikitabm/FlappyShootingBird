@@ -20,16 +20,21 @@ let shootingDirection = 0;
 const image = new Image();
 image.src = "img/sprite.png";
 
-// bird variables
-const startX = 50;
-const startY = 50;
 
-const animFrames = [
+
+// variables used in objects
+
+// bird
+const birdStartX = 50;
+const birdStartY = 50;
+
+const birdAnimFrames = [
     frame0 = { x: 276, y: 112 },
     frame1 = { x: 276, y: 139 },
     frame2 = { x: 276, y: 164 }];
 
-// game state
+
+// game state: state.current is used to keep track of current game state
 const state = {
     current: 0,
     getReady: 0,
@@ -37,7 +42,7 @@ const state = {
     gameOver: 2
 };
 
-// coordinates of start button
+// coordinates of start button in Game Over screen: used for collision checking
 const startBtn = {
     x: 120,
     y: 263,
@@ -45,29 +50,28 @@ const startBtn = {
     h: 29
 };
 
-
 // =====================================================================================================
 // --------------------------------------------/ Load Sounds /------------------------------------------
 // =====================================================================================================
 
-const SCORE_S = new Audio();
-SCORE_S.src = "audio/sfx_point.wav";
+const scoreClip = new Audio();
+scoreClip.src = "audio/sfx_point.wav";
 
-const FLAP = new Audio()
-FLAP.src = "audio/sfx_flap.wav";
+const flapClip = new Audio()
+flapClip.src = "audio/sfx_flap.wav";
 
-const HIT = new Audio();
-HIT.src = "audio/sfx_hit.wav";
+const hitClip = new Audio();
+hitClip.src = "audio/sfx_hit.wav";
 
-const SWOOSHING = new Audio();
-SWOOSHING.src = "audio/sfx_swooshing.wav";
+const startGameClip = new Audio();
+startGameClip.src = "audio/sfx_swooshing.wav";
 
-const DIE = new Audio();
-DIE.src = "audio/sfx_die.wav";
+const dieClip = new Audio();
+dieClip.src = "audio/sfx_die.wav";
 
 
 // =====================================================================================================
-// --------------------------------------/ Classes Definition /-----------------------------------------
+// ---------------------------------------/ Class Definitions /-----------------------------------------
 // =====================================================================================================
 
 class BoxCollider {
@@ -102,12 +106,14 @@ class Sprite {
 
 class GameManager {
     constructor() {
-        this.bestScore = parseInt(localStorage.getItem("bestScore")) || 0;
+        //create variables to keep track of best score of the game and current score;
+        this.bestScore = parseInt(localStorage.getItem("bestScore")) || 0; //load best score if exists, else make it 0
         this.currentScore = 0;
-        this.objects = [];
-        this.colliders = [];
+        this.objects = [];      //array of objects registered in the game
+        this.colliders = [];    //array of colliders registered in the game
     }
 
+    // register object, if object has any colliders- register them as well
     registerObject(object) {
         this.objects.push(object);
 
@@ -117,11 +123,14 @@ class GameManager {
             });
         }
     }
+
+    // return array of objects with the same name
     getObjectsByName(name) {
         let objectsWithName = this.objects.filter(obj => obj.name === name);
         return objectsWithName;
     }
 
+    // delete object from objects array, deregister its colliders as well
     deregisterObject(object) {
         this.objects = this.objects.filter(obj => obj !== object);
         // unregister colliders of the objects;
@@ -132,22 +141,28 @@ class GameManager {
         }
     }
 
+    // add collider to the array of colliders
     registerCollider(collider) {
         this.colliders.push(collider);
     }
 
+    //delete collider from the array of colliders
     deregisterCollider(collider) {
         this.colliders = this.colliders.filter(obj => obj !== collider);
     }
 
+    // render all registered objects
     renderObjects() {
-        ctx.fillStyle = "#70c5ce";
+        ctx.fillStyle = "#70c5ce"; //clear canvas with light blue color so it looks like there is a sky
         ctx.fillRect(0, 0, cvs.width, cvs.height);
         this.objects.forEach(element => {
-            element.draw();
+            if (element.draw != null) {
+                element.draw();
+            }
         });
     }
 
+    //update all registered objects
     updateObjects() {
         this.objects.forEach(element => {
             if (element.update != null) {
@@ -156,6 +171,7 @@ class GameManager {
         });
     }
 
+    // check collision between two colliders and call onCollision if collision occurs
     checkCollision(colliderOne, colliderTwo, onCollision) {
         let xCheck = colliderOne.x < colliderTwo.x + colliderTwo.width &&
             colliderOne.x + colliderOne.width > colliderTwo.x;
@@ -170,6 +186,8 @@ class GameManager {
         }
     }
 
+    // check collision  between collider and all colliders of tag
+    // if collision occurs call onCollision
     checkCollisionByTag(collider, tag, onCollision) {
         if (!collider.active) return;
 
@@ -186,6 +204,8 @@ class GameManager {
 // =====================================================================================================
 // --------------------------------------------/ Entity /-----------------------------------------------
 // =====================================================================================================
+
+// Entity is a base class of all  objects in the game
 
 class Entity {
     constructor(name, sprite, active, visible, x, y, w, h) {
@@ -209,10 +229,15 @@ class Entity {
 
     update() { }
 
+    //Base draw function
     draw() {
         if (this.visible) {
             this.sprite.draw(this.x, this.y, this.w, this.h);
         }
+    }
+
+    destroySelf() {
+        gameManager.deregisterObject(this);
     }
 }
 
@@ -232,7 +257,6 @@ class ShootingTarget extends Entity {
 
     update() {
         if (this.active) {
-
             this.x += this.xSpeed; // move shooting target
             // if target is outside the screen move it to the random position between two incomming pipes
             if (this.x + this.w < 0) {
@@ -241,8 +265,8 @@ class ShootingTarget extends Entity {
             this.updateColliders(); // update position of the collider
         }
     }
-
 }
+
 class Arrow extends Entity {
     constructor(name, sprite, active, visible, ySpeed, x, y, w, h) {
         super(name, sprite, active, visible, x, y, w, h);
@@ -257,15 +281,12 @@ class Arrow extends Entity {
             this.y += this.ySpeed;
 
             this.updateColliders();
+
             // destroy arrow after  15 frames in the game
             if (framesCount - this.currentFrame > 15) {
                 this.destroySelf();
             }
         }
-    }
-
-    destroySelf() {
-        gameManager.deregisterObject(this);
     }
 }
 
@@ -327,7 +348,7 @@ class Bird extends Entity {
     }
 
     setAnimationFrame() {
-        // IF THE GAME STATE IS GET READY STATE, THE BIRD MUST FLAP SLOWLY
+        // IF THE GAME STATE IS GET READY STATE, THE BIRD MUST flapClip SLOWLY
         this.period = state.current == state.getReady ? 10 : 5;
         // WE INCREMENT THE FRAME BY 1, EACH PERIOD
         this.animFrame += framesCount % this.period == 0 ? 1 : 0;
@@ -405,8 +426,9 @@ class PipeObstacle extends Entity {
 
             this.updateColliders();
 
+            //generate new pipe obstacle if pipe obstacle moves outside the screen and destroy self
             if (this.x + this.w < 0) {
-                gameManager.deregisterObject(this);
+                this.destroySelf();
                 generatePipeObstacle(this.gap, this.maxYPos);
             }
         }
@@ -440,7 +462,7 @@ function shootArrow(x, y, speed) {
 function deregisterPipes() {
     let pipes = gameManager.getObjectsByName("pipeObstacle");
     pipes.forEach(element => {
-        gameManager.deregisterObject(element);
+        element.destroySelf();
     });
 }
 // =====================================================================================================
@@ -451,7 +473,7 @@ function startGame() {
     // set state of the game
     state.current = state.game;
 
-    SWOOSHING.play();
+    startGameClip.play();
 
     // hide get ready screen
     getReady.visible = false;
@@ -480,8 +502,8 @@ function restartGame() {
     // reset bird variables to defaults
     bird.yVelocity = 0;
     bird.active = false;
-    bird.x = birdVars.startX;
-    bird.y = birdVars.startY;
+    bird.x = birdStartX;
+    bird.y = birdStartY;
 
     // show get ready screen, hide game over screen
     getReady.visible = true;
@@ -532,6 +554,15 @@ function showDeathScreen() {
 // Object manager
 const gameManager = new GameManager();
 
+
+// Pipe Sprites
+const topPipeSpr = new Sprite(image, 554, 0, 52, 400);
+const botPipeSpr = new Sprite(image, 502, 0, 52, 400);
+
+// Arrow Sprite
+const arrowSpr = new Sprite(image, 431, 119, 6, 29);
+
+
 // Background
 // one background entity is too thin to cover whole screen
 // lets create two entities with the same sprite for that
@@ -557,26 +588,20 @@ const getReady = new Entity("getReady", getReadySpr, true, true, cvs.width / 2 -
 const gameOverSpr = new Sprite(image, 175, 228, 225, 202);
 const gameOver = new Entity("gameOver", gameOverSpr, false, false, cvs.width / 2 - gameOverSpr.width / 2, 90, gameOverSpr.width, gameOverSpr.height);
 
+
+// Player Score
 const playerScore = new CustomText("currentScore", 0, cvs.clientWidth / 2, 50, false, "35px Teko");
-
-// Pipe Sprites
-const topPipeSpr = new Sprite(image, 554, 0, 52, 400);
-const botPipeSpr = new Sprite(image, 502, 0, 52, 400);
-
-// Arrow Sprite
-const arrowSpr = new Sprite(image, 431, 119, 6, 29);
 
 
 // Shooting target
 const shootingTargetSpr = new Sprite(image, 415, 170, 57, 7);
-
 const shootingTarget = new ShootingTarget("shootingTarget", shootingTargetSpr, false, true,
     -2, cvs.clientWidth * 1.5, 30, shootingTargetSpr.width / 2, shootingTargetSpr.height);
 
 
 // Bird 
 const birdSpr = new Sprite(image, frame0.x, frame0.y, 36, 26);
-const bird = new Bird("bird", birdSpr, false, true, animFrames, startX, startY, 34, 26, 0, 0.25, 4.6);
+const bird = new Bird("bird", birdSpr, false, true, birdAnimFrames, birdStartX, birdStartY, 34, 26, 0, 0.25, 4.6);
 
 
 //Registering Objects to game manager
@@ -591,7 +616,6 @@ gameManager.registerObject(bird);
 gameManager.registerObject(getReady);
 
 
-
 // =====================================================================================================
 // --------------------------------------/ Click Listener /---------------------------------------------
 // =====================================================================================================
@@ -604,7 +628,7 @@ cvs.addEventListener("click", function (evt) {
 
         case state.game:
             bird.jump();
-            FLAP.play();
+            flapClip.play();
 
             // switch direction of shooting with every click
             let arrowSpeed = 15;
@@ -637,14 +661,14 @@ cvs.addEventListener("click", function (evt) {
 // =====================================================================================================
 
 function onBirdDeath(collided, collider) {
-    HIT.play();
+    hitClip.play();
     showDeathScreen();
 }
 
 function onIncreaseScore(collided, collider) {
     gameManager.currentScore += 1;
     playerScore.text = gameManager.currentScore;
-    SCORE_S.play();
+    scoreClip.play();
     if (gameManager.currentScore > gameManager.bestScore) {
         gameManager.bestScore = gameManager.currentScore;
         localStorage.setItem("bestScore", gameManager.bestScore);
@@ -653,10 +677,9 @@ function onIncreaseScore(collided, collider) {
 }
 
 function onBirdHitFloor(collided, collider) {
-    DIE.play();
+    dieClip.play();
     showDeathScreen();
 }
-
 
 function checkCollisions() {
     gameManager.checkCollisionByTag(shootingTarget.colliders[0], "arrow", onIncreaseScore);
@@ -672,10 +695,13 @@ function loop() {
     gameManager.updateObjects();
     gameManager.renderObjects();
 
+    // small optimisation
     if (state.current == state.game) {
         checkCollisions();
     }
-    framesCount++;
-    requestAnimationFrame(loop);
+
+    framesCount++; //update frames count (handy variable to have)
+    requestAnimationFrame(loop); // loop
 }
-loop();
+
+loop(); //Call Loop
